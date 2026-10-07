@@ -11,5 +11,6 @@ Without Flex, enable `Nowo\HttpHardeningBundle\NowoHttpHardeningBundle` in `conf
 Next steps:
 
 - [Configuration](CONFIGURATION.md) — header values and optional anonymous session strip
+- [Usage](USAGE.md) — headers (automatic) and enabling anonymous session strip
 - [Security](SECURITY.md) — threat model and host duties (CSP, public-route lists)
 - [Upgrading](UPGRADING.md) — version notes

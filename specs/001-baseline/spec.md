@@ -1,8 +1,8 @@
 # Baseline specification — HTTP Hardening Bundle
 
-**Status**: Implemented — `v1.0.2`  
+**Status**: Implemented — `v1.0.3`  
 **Last audited:** 2026-10-07  
-**Aligned with:** public API / config through **v1.0.1+**
+**Aligned with:** public API / config through **v1.0.3**
 
 ## Summary
 

@@ -1,5 +1,13 @@
 # Upgrading
 
+## From 1.0.2 to 1.0.3
+
+No configuration or API changes. Spec/docs alignment only:
+
+```bash
+composer update nowo-tech/http-hardening-bundle
+```
+
 ## From 1.0.1 to 1.0.2
 
 No configuration or API changes. Documentation and Spec Kit baseline only:

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-10-07
+
+### Changed
+
+- Spec Kit baseline status/alignment set to **v1.0.3**.
+- Installation docs link to [USAGE.md](USAGE.md).
+
 ## [1.0.2] - 2026-10-07
 
 ### Added
@@ -44,7 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnonymousSessionCookieStripSubscriber`: strip the session cookie on configured public GET/HEAD routes for anonymous users and set public Cache-Control.
 - Flex recipe `nowo_http_hardening.yaml` with strip disabled by default.
 
-[Unreleased]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/nowo-tech/HttpHardeningBundle/releases/tag/v1.0.0

@@ -1,7 +1,7 @@
 # Code inventory — baseline (100% of production `src/`)
 
 **Last audited:** 2026-10-07  
-**Aligned with:** **v1.0.1+**
+**Aligned with:** **v1.0.3**
 
 Every production PHP unit under `src/` is listed. Tests and tooling are out of scope.
 

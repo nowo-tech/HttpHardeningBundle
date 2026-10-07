@@ -23,4 +23,4 @@ Follow declared PHP/Symfony ranges in `composer.json` and README badges.
 ## Governance
 Amendments update this file, baseline spec when principles affect behavior, and `CHANGELOG.md` when consumer-visible.
 
-**Version**: 1.0.1 | **Ratified**: 2026-10-07 | **Last Amended**: 2026-10-07
+**Version**: 1.0.3 | **Ratified**: 2026-10-07 | **Last Amended**: 2026-10-07
