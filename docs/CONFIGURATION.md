@@ -29,3 +29,5 @@ Existing response headers are never overwritten.
 | `cache_control` | `public, max-age=120, must-revalidate` | Applied when the session cookie was stripped and `public` is absent |
 
 Authenticated users (`UserInterface`) always keep the session cookie. Other cookies (consent, etc.) are preserved.
+
+Do not enable strip on routes that still need an anonymous session. See [SECURITY.md](SECURITY.md).

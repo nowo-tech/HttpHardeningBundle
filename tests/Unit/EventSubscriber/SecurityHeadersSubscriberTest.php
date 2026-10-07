@@ -70,4 +70,74 @@ final class SecurityHeadersSubscriberTest extends TestCase
 
         self::assertSame('custom', $response->headers->get('X-Content-Type-Options'));
     }
+
+    public function testIgnoresSubRequests(): void
+    {
+        $subscriber = new SecurityHeadersSubscriber();
+        $request = Request::create('https://example.com/');
+        $response = new Response('ok');
+        $event = new ResponseEvent(
+            $this->createStub(HttpKernelInterface::class),
+            $request,
+            HttpKernelInterface::SUB_REQUEST,
+            $response,
+        );
+
+        $subscriber($event);
+
+        self::assertNull($response->headers->get('X-Content-Type-Options'));
+    }
+
+    public function testSkipsHstsOnInsecureRequests(): void
+    {
+        $subscriber = new SecurityHeadersSubscriber();
+        $request = Request::create('http://example.com/');
+        $response = new Response('ok');
+        $event = new ResponseEvent(
+            $this->createStub(HttpKernelInterface::class),
+            $request,
+            HttpKernelInterface::MAIN_REQUEST,
+            $response,
+        );
+
+        $subscriber($event);
+
+        self::assertNull($response->headers->get('Strict-Transport-Security'));
+        self::assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
+    }
+
+    public function testCanSendHstsOnLoopbackWhenSkipDisabled(): void
+    {
+        $subscriber = new SecurityHeadersSubscriber(hstsSkipLoopback: false);
+        $request = Request::create('https://127.0.0.1/');
+        $response = new Response('ok');
+        $event = new ResponseEvent(
+            $this->createStub(HttpKernelInterface::class),
+            $request,
+            HttpKernelInterface::MAIN_REQUEST,
+            $response,
+        );
+
+        $subscriber($event);
+
+        self::assertSame('max-age=31536000; includeSubDomains', $response->headers->get('Strict-Transport-Security'));
+    }
+
+    public function testEmptyHeaderValuesAreSkipped(): void
+    {
+        $subscriber = new SecurityHeadersSubscriber(xContentTypeOptions: '');
+        $request = Request::create('https://example.com/');
+        $response = new Response('ok');
+        $event = new ResponseEvent(
+            $this->createStub(HttpKernelInterface::class),
+            $request,
+            HttpKernelInterface::MAIN_REQUEST,
+            $response,
+        );
+
+        $subscriber($event);
+
+        self::assertNull($response->headers->get('X-Content-Type-Options'));
+        self::assertSame('SAMEORIGIN', $response->headers->get('X-Frame-Options'));
+    }
 }

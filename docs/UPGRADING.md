@@ -1,5 +1,15 @@
 # Upgrading
 
+## From 1.0.0 to 1.0.1
+
+No configuration or API changes. Safe to upgrade in place:
+
+```bash
+composer update nowo-tech/http-hardening-bundle
+```
+
+Review [docs/SECURITY.md](SECURITY.md) if you maintain a local security checklist — the threat model and 12.4.1 release items are now complete. Behaviour of security headers and anonymous session strip is unchanged.
+
 ## First install
 
 ```bash
@@ -25,4 +35,4 @@ nowo_http_hardening:
             - nowo_pwa_service_worker
 ```
 
-Requires `security.token_storage` in the host when strip is enabled.
+Requires `security.token_storage` in the host when strip is enabled. Do not enable strip on routes that still need an anonymous session (login CSRF, carts, multi-step forms). See [SECURITY.md](SECURITY.md).

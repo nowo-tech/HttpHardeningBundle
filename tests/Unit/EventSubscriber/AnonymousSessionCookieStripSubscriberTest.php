@@ -82,4 +82,84 @@ final class AnonymousSessionCookieStripSubscriberTest extends TestCase
         $names = array_map(static fn (Cookie $c): string => $c->getName(), $response->headers->getCookies());
         self::assertContains('APPSESSID', $names);
     }
+
+    public function testIgnoresSubRequestsAndNonGetMethods(): void
+    {
+        $tokenStorage = $this->createStub(TokenStorageInterface::class);
+        $tokenStorage->method('getToken')->willReturn(null);
+        $subscriber = new AnonymousSessionCookieStripSubscriber($tokenStorage, 'APPSESSID', ['site_'], []);
+
+        $post = Request::create('https://example.com/', 'POST');
+        $post->attributes->set('_route', 'site_home');
+        $postResponse = new Response('ok');
+        $postResponse->headers->setCookie(Cookie::create('APPSESSID', 'abc'));
+        $subscriber(new ResponseEvent(
+            $this->createStub(HttpKernelInterface::class),
+            $post,
+            HttpKernelInterface::MAIN_REQUEST,
+            $postResponse,
+        ));
+        self::assertContains('APPSESSID', array_map(
+            static fn (Cookie $c): string => $c->getName(),
+            $postResponse->headers->getCookies(),
+        ));
+
+        $sub = Request::create('https://example.com/');
+        $sub->attributes->set('_route', 'site_home');
+        $subResponse = new Response('ok');
+        $subResponse->headers->setCookie(Cookie::create('APPSESSID', 'abc'));
+        $subscriber(new ResponseEvent(
+            $this->createStub(HttpKernelInterface::class),
+            $sub,
+            HttpKernelInterface::SUB_REQUEST,
+            $subResponse,
+        ));
+        self::assertContains('APPSESSID', array_map(
+            static fn (Cookie $c): string => $c->getName(),
+            $subResponse->headers->getCookies(),
+        ));
+    }
+
+    public function testDoesNothingWhenRouteIsNotPublicOrSessionCookieAbsent(): void
+    {
+        $tokenStorage = $this->createStub(TokenStorageInterface::class);
+        $tokenStorage->method('getToken')->willReturn(null);
+        $subscriber = new AnonymousSessionCookieStripSubscriber(
+            $tokenStorage,
+            'APPSESSID',
+            [''],
+            ['exact_public'],
+        );
+
+        $private = Request::create('https://example.com/');
+        $private->attributes->set('_route', 'admin_dashboard');
+        $privateResponse = new Response('ok');
+        $privateResponse->headers->setCookie(Cookie::create('APPSESSID', 'abc'));
+        $subscriber(new ResponseEvent(
+            $this->createStub(HttpKernelInterface::class),
+            $private,
+            HttpKernelInterface::MAIN_REQUEST,
+            $privateResponse,
+        ));
+        self::assertContains('APPSESSID', array_map(
+            static fn (Cookie $c): string => $c->getName(),
+            $privateResponse->headers->getCookies(),
+        ));
+
+        $public = Request::create('https://example.com/');
+        $public->attributes->set('_route', 'exact_public');
+        $publicResponse = new Response('ok');
+        $publicResponse->headers->setCookie(Cookie::create('consent', '1'));
+        $subscriber(new ResponseEvent(
+            $this->createStub(HttpKernelInterface::class),
+            $public,
+            HttpKernelInterface::MAIN_REQUEST,
+            $publicResponse,
+        ));
+        self::assertContains('consent', array_map(
+            static fn (Cookie $c): string => $c->getName(),
+            $publicResponse->headers->getCookies(),
+        ));
+        self::assertFalse($publicResponse->headers->hasCacheControlDirective('public'));
+    }
 }
