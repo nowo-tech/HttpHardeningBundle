@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-07
+
+### Added
+
+- Integrator docs: `USAGE.md`, `ENGRAM.md`, `SPEC-DRIVEN-DEVELOPMENT.md`, `SPEC-KIT.md`, `PSR.md` (REQ-CS-007).
+- Spec Kit baseline `specs/001-baseline/{spec.md,code-inventory.md}` (5/5 `src/` mapped) and tailored constitution.
+- README canonical `## Documentation` order, full badge set, and “Found this useful?” line.
+
+### Changed
+
+- GitHub About (description, website, topics) for REQ-DOCS-018.
+
 ## [1.0.1] - 2026-10-07
 
 ### Added
@@ -32,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnonymousSessionCookieStripSubscriber`: strip the session cookie on configured public GET/HEAD routes for anonymous users and set public Cache-Control.
 - Flex recipe `nowo_http_hardening.yaml` with strip disabled by default.
 
-[Unreleased]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/nowo-tech/HttpHardeningBundle/releases/tag/v1.0.0
