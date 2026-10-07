@@ -1,0 +1,3 @@
+* HTTP Hardening is enabled with security headers by default.
+* Enable anonymous_session_strip only after listing public route prefixes/names
+  (see docs/CONFIGURATION.md). Authenticated users keep the session cookie.

@@ -1,0 +1,13 @@
+nowo_http_hardening:
+    security_headers:
+        enabled: true
+        # hsts_skip_loopback: true  # default — do not pin localhost
+    anonymous_session_strip:
+        enabled: false
+        # session_cookie_name: '%app.session_cookie_name%'
+        # public_route_name_prefixes: ['site_', 'legal_']
+        # public_route_names:
+        #     - nowo_seo_kit_robots
+        #     - nowo_seo_kit_sitemap
+        #     - nowo_pwa_manifest
+        #     - nowo_pwa_service_worker

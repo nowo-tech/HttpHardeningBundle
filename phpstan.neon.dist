@@ -1,0 +1,13 @@
+includes:
+    - vendor/nowo-tech/phpstan-frankenphp/ruleset-classic.neon
+    - vendor/nowo-tech/phpstan-frankenphp/ruleset-worker-strict.neon
+    - vendor/nowo-tech/phpstan-frankenphp/ruleset-hardening.neon
+
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+    excludePaths:
+        - vendor/*
+    ignoreErrors: []

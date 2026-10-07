@@ -1,0 +1,103 @@
+{
+    "name": "nowo-tech/http-hardening-bundle",
+    "description": "Symfony bundle for public HTTP hardening: security headers (nosniff, HSTS, Permissions-Policy, CORP) and optional anonymous session-cookie strip for CDN-friendly public GET pages.",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "keywords": [
+        "symfony",
+        "symfony-bundle",
+        "security-headers",
+        "hsts",
+        "cdn",
+        "cache",
+        "session",
+        "hardening"
+    ],
+    "homepage": "https://github.com/nowo-tech/HttpHardeningBundle",
+    "support": {
+        "issues": "https://github.com/nowo-tech/HttpHardeningBundle/issues",
+        "source": "https://github.com/nowo-tech/HttpHardeningBundle",
+        "docs": "https://github.com/nowo-tech/HttpHardeningBundle/tree/main/docs",
+        "changelog": "https://github.com/nowo-tech/HttpHardeningBundle/blob/main/docs/CHANGELOG.md"
+    },
+    "authors": [
+        {
+            "name": "Héctor Franco Aceituno",
+            "email": "hectorfranco@nowo.tech",
+            "homepage": "https://github.com/HecFranco",
+            "role": "Developer"
+        },
+        {
+            "name": "Nowo.tech",
+            "homepage": "https://nowo.tech"
+        }
+    ],
+    "require": {
+        "php": ">=8.2 <8.6",
+        "symfony/config": "^7.4 || ^8.0",
+        "symfony/dependency-injection": "^7.4 || ^8.0",
+        "symfony/http-foundation": "^7.4 || ^8.0",
+        "symfony/http-kernel": "^7.4 || ^8.0",
+        "symfony/security-core": "^7.4 || ^8.0",
+        "symfony/yaml": "^7.4 || ^8.0"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.64",
+        "igor-php/igor-php": "^0.10.0",
+        "nowo-tech/phpstan-frankenphp": "^1.0",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpstan/phpstan-symfony": "^2.0",
+        "phpunit/phpunit": "^11.0",
+        "rector/rector": "^2.0",
+        "symfony/phpunit-bridge": "^7.4 || ^8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Nowo\\HttpHardeningBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Nowo\\HttpHardeningBundle\\Tests\\": "tests/"
+        }
+    },
+    "archive": {
+        "exclude": [
+            "/demo",
+            "/.cursor"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "phpstan/extension-installer": true
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.0.x-dev"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts": {
+        "test": "phpunit --colors=always",
+        "test-unit": "phpunit --testsuite=Unit --colors=always",
+        "test-coverage": "phpunit --colors=always --coverage-html coverage --coverage-clover coverage.xml --coverage-text",
+        "cs-check": "php-cs-fixer fix --dry-run --diff --config=.php-cs-fixer.dist.php",
+        "cs-fix": "php-cs-fixer fix --config=.php-cs-fixer.dist.php",
+        "rector": "rector process",
+        "rector-dry": "rector process --dry-run --no-progress-bar",
+        "phpstan": "phpstan analyse --memory-limit=512M",
+        "update": "composer update --no-interaction",
+        "validate": "composer validate --strict",
+        "qa": ["@cs-check", "@test"],
+        "igor": "igor-php --no-agent ."
+    },
+    "suggest": {
+        "symfony/flex": "For automatic recipe installation",
+        "symfony/security-bundle": "Required in the host app when anonymous_session_strip is enabled"
+    }
+}
