@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-10-09
+
+### Dependencies
+
+- Dev lockfile refresh: `phpstan/phpstan` 2.3.1, `nowo-tech/phpstan-frankenphp` 1.2.3. No runtime changes.
+
 ## [1.0.3] - 2026-10-07
 
 ### Changed
@@ -51,7 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnonymousSessionCookieStripSubscriber`: strip the session cookie on configured public GET/HEAD routes for anonymous users and set public Cache-Control.
 - Flex recipe `nowo_http_hardening.yaml` with strip disabled by default.
 
-[Unreleased]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.0...v1.0.1

@@ -1,5 +1,13 @@
 # Upgrading
 
+## From 1.0.3 to 1.0.4
+
+No breaking changes. No application upgrade steps (dev dependency lockfile refresh only):
+
+```bash
+composer update nowo-tech/http-hardening-bundle
+```
+
 ## From 1.0.2 to 1.0.3
 
 No configuration or API changes. Spec/docs alignment only:
