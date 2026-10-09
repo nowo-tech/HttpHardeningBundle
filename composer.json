@@ -1,6 +1,6 @@
 {
     "name": "nowo-tech/http-hardening-bundle",
-    "description": "Symfony bundle for public HTTP hardening: security headers (nosniff, HSTS, Permissions-Policy, CORP) and optional anonymous session-cookie strip for CDN-friendly public GET pages.",
+    "description": "Symfony bundle for public HTTP hardening: security headers (nosniff, HSTS, Permissions-Policy, CORP), nonce-based Content-Security-Policy, public Cache-Control, www-to-apex redirect, safe internal redirects and optional anonymous session-cookie strip for CDN-friendly public GET pages.",
     "type": "symfony-bundle",
     "license": "MIT",
     "keywords": [
@@ -11,7 +11,9 @@
         "cdn",
         "cache",
         "session",
-        "hardening"
+        "hardening",
+        "csp",
+        "content-security-policy"
     ],
     "homepage": "https://github.com/nowo-tech/HttpHardeningBundle",
     "support": {
@@ -51,7 +53,9 @@
         "phpstan/phpstan-symfony": "^2.0",
         "phpunit/phpunit": "^11.0",
         "rector/rector": "^2.0",
-        "symfony/phpunit-bridge": "^7.4 || ^8.0"
+        "symfony/console": "^7.4 || ^8.0",
+        "symfony/phpunit-bridge": "^7.4 || ^8.0",
+        "twig/twig": "^3.12"
     },
     "autoload": {
         "psr-4": {
@@ -98,6 +102,8 @@
     },
     "suggest": {
         "symfony/flex": "For automatic recipe installation",
-        "symfony/security-bundle": "Required in the host app when anonymous_session_strip is enabled"
+        "symfony/security-bundle": "Required in the host app when anonymous_session_strip or public_cache is enabled",
+        "symfony/console": "For the nowo:http-hardening:lint-csp-nonces command",
+        "twig/twig": "For the csp_nonce() / |csp_stamp and safe_internal_path() / safe_href() Twig helpers"
     }
 }

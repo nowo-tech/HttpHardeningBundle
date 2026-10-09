@@ -22,10 +22,10 @@ Config root: `nowo_http_hardening`.
 
 ## Non-goals
 
-- Full Content-Security-Policy generation
+- Full Content-Security-Policy generation *(superseded: opt-in CSP added in [002-csp-public-cache](../002-csp-public-cache/spec.md))*
 - WAF, TLS termination, authentication, or authorization
 - HTML body sanitization / XSS filtering
-- Admin UI, Twig, or frontend assets
+- Admin UI or frontend assets (optional Twig helpers: see [002-csp-public-cache](../002-csp-public-cache/spec.md))
 - Demos (none in this package)
 
 ## User scenarios

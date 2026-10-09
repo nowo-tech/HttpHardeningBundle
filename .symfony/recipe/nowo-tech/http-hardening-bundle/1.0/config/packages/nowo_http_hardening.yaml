@@ -11,3 +11,15 @@ nowo_http_hardening:
         #     - nowo_seo_kit_sitemap
         #     - nowo_pwa_manifest
         #     - nowo_pwa_service_worker
+    # Opt-in (all off by default) — see docs/CONFIGURATION.md
+    # csp:
+    #     enabled: true
+    #     report_only: true
+    #     connect_src_extra: []
+    # public_cache:
+    #     enabled: true
+    #     page_route_name_prefixes: ['site_', 'legal_']
+    #     file_route_names: [nowo_seo_kit_sitemap, nowo_seo_kit_robots]
+    # canonical_host:
+    #     enabled: true
+    #     base_url: '%env(SITE_PUBLIC_BASE_URL)%'

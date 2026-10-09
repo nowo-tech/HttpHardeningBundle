@@ -26,4 +26,4 @@ Every production PHP unit under `src/` is listed. Tests and tooling are out of s
 | -------- | ------ | ---------------- |
 | PHP under `src/` | **5** | **5** |
 
-**Inventory complete — 5/5.** No Twig, YAML resources, or frontend assets under `src/`.
+**Inventory complete — 5/5** for the baseline. Files added later are mapped in [002-csp-public-cache/code-inventory.md](../002-csp-public-cache/code-inventory.md) (16/16 overall).
