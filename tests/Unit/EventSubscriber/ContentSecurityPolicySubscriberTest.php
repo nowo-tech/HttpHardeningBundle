@@ -264,6 +264,41 @@ final class ContentSecurityPolicySubscriberTest extends TestCase
         self::assertStringContainsString("'nonce-abc123'", (string) $response->headers->get('Content-Security-Policy'));
     }
 
+    public function testNonceFreeStylePathsAllowUnsafeInlineStylesWithoutNonce(): void
+    {
+        $subscriber = new ContentSecurityPolicySubscriber(
+            kernelDebug: false,
+            nonceFreeStylePathPrefixes: ['/admin/legal/', '', '/dashboard'],
+        );
+
+        foreach (['/admin/legal', '/admin/legal/privacy/edit', '/dashboard'] as $path) {
+            $request = Request::create($path);
+            $request->attributes->set(ContentSecurityPolicySubscriber::REQUEST_ATTRIBUTE_NONCE, 'abc123');
+            $response = new Response('<html><head></head></html>', Response::HTTP_OK, ['Content-Type' => 'text/html']);
+            $subscriber($this->responseEvent($request, $response));
+            $csp = (string) $response->headers->get('Content-Security-Policy');
+
+            self::assertStringContainsString("style-src-elem 'self' 'unsafe-inline';", $csp, $path);
+            self::assertStringContainsString("script-src 'self' 'nonce-abc123'", $csp, $path.' keeps the script nonce');
+        }
+
+        foreach (['/admin/legalese', '/', '/dashboards'] as $path) {
+            $request = Request::create($path);
+            $request->attributes->set(ContentSecurityPolicySubscriber::REQUEST_ATTRIBUTE_NONCE, 'abc123');
+            $response = new Response('<html><head></head></html>', Response::HTTP_OK, ['Content-Type' => 'text/html']);
+            $subscriber($this->responseEvent($request, $response));
+
+            self::assertStringContainsString("style-src-elem 'self' 'nonce-abc123';", (string) $response->headers->get('Content-Security-Policy'), $path);
+        }
+
+        // Debug relaxations do not duplicate 'unsafe-inline'.
+        $debug = new ContentSecurityPolicySubscriber(kernelDebug: true, nonceFreeStylePathPrefixes: ['/admin/legal']);
+        $request = Request::create('/admin/legal');
+        $response = new Response('<html></html>', Response::HTTP_OK, ['Content-Type' => 'text/html']);
+        $debug($this->responseEvent($request, $response));
+        self::assertStringContainsString("style-src-elem 'self' 'unsafe-inline';", (string) $response->headers->get('Content-Security-Policy'));
+    }
+
     /**
      * @param array<string, list<string>> $extraSources
      */

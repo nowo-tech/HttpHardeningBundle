@@ -105,6 +105,11 @@ final class Configuration implements ConfigurationInterface
                             ->info('Paths that never receive the header (Web Profiler fragments by default).')
                             ->scalarPrototype()->end()
                             ->defaultValue(['/_wdt', '/_profiler'])
+                        ->end()
+                        ->arrayNode('nonce_free_style_path_prefixes')
+                            ->info("Paths (segment-aware prefix) whose style-src-elem drops the nonce and allows 'unsafe-inline' — routes mounting editors that inject <style> at runtime (e.g. CKEditor 5).")
+                            ->scalarPrototype()->end()
+                            ->defaultValue([])
                         ->end();
 
         foreach (ContentSecurityPolicySubscriber::DEFAULT_DIRECTIVES as $directive => $sources) {

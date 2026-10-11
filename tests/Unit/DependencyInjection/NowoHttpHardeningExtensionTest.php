@@ -102,6 +102,7 @@ final class NowoHttpHardeningExtensionTest extends TestCase
                     'img_src_extra' => ['https://cdn.example'],
                     'frame_src' => [],
                     'excluded_path_prefixes' => ['/_wdt'],
+                    'nonce_free_style_path_prefixes' => ['/admin/legal'],
                 ],
             ],
         ], $container);
@@ -121,6 +122,7 @@ final class NowoHttpHardeningExtensionTest extends TestCase
         self::assertFalse($definition->getArgument('$stampNonces'));
         self::assertFalse($definition->getArgument('$debugRelaxations'));
         self::assertTrue($definition->getArgument('$reportOnly'));
+        self::assertSame(['/admin/legal'], $definition->getArgument('$nonceFreeStylePathPrefixes'));
 
         $tags = $definition->getTag('kernel.event_listener');
         self::assertSame(['kernel.request', 'onRequest', 1024], [$tags[0]['event'], $tags[0]['method'], $tags[0]['priority']]);

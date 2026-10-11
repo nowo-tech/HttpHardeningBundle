@@ -1,5 +1,24 @@
 # Upgrading
 
+## From 1.1.x to 1.2.0
+
+No breaking changes; the new key defaults to `[]`.
+
+```bash
+composer update nowo-tech/http-hardening-bundle
+```
+
+If a host kept its own CSP listener only to drop the style nonce on editor routes (CKEditor 5 needs `style-src-elem 'unsafe-inline'` without a nonce), switch to the bundle CSP and list those routes:
+
+```yaml
+nowo_http_hardening:
+    csp:
+        enabled: true
+        nonce_free_style_path_prefixes: ['/admin/legal', '/admin/pages']
+```
+
+Then delete the host listener and its `csp_nonce()` Twig function (the bundle registers both).
+
 ## From 1.0.x to 1.1.0
 
 No breaking changes. Every new feature is **off by default**; existing configuration keeps working unchanged. Only the `SafeInternalRedirect` service, the `InlineNonceLinter` service and (with `symfony/console`) the `nowo:http-hardening:lint-csp-nonces` command are registered unconditionally — they are stateless and have no effect until used.

@@ -27,6 +27,10 @@ use function is_string;
  * injected markup, so layouts that print editor/CMS HTML opt out with {@see self::STRICT_NONCE_MARKER}
  * on their `<html>` tag and nonce every inline block explicitly. Only the first `<html>` tag counts.
  *
+ * Paths listed in `$nonceFreeStylePathPrefixes` (editors that inject `<style>` at runtime, e.g.
+ * CKEditor 5) get `style-src-elem` **without** the nonce and with `'unsafe-inline'`: a nonce makes
+ * browsers ignore `'unsafe-inline'`. `script-src` keeps its nonce on those paths.
+ *
  * In `kernel.debug` (unless debug relaxations are disabled) `script-src` gains `'unsafe-eval'`,
  * `style-src-elem` gains `'unsafe-inline'` and `connect-src` gains `ws: wss:` (Vite HMR, Web
  * Profiler). Runs before the Web Profiler toolbar listener so it can merge its own nonces.
@@ -73,10 +77,11 @@ final readonly class ContentSecurityPolicySubscriber
     ];
 
     /**
-     * @param array<string, list<string>>          $directives           directive name => base sources, in emission order
-     * @param array<string, list<string>>          $extraSources         directive name => appended sources
+     * @param array<string, list<string>>          $directives                 directive name => base sources, in emission order
+     * @param array<string, list<string>>          $extraSources               directive name => appended sources
      * @param iterable<CspSourceProviderInterface> $sourceProviders
-     * @param list<string>                         $excludedPathPrefixes paths that never receive the header
+     * @param list<string>                         $excludedPathPrefixes       paths that never receive the header
+     * @param list<string>                         $nonceFreeStylePathPrefixes paths whose style-src-elem drops the nonce for 'unsafe-inline'
      */
     public function __construct(
         private bool $kernelDebug = false,
@@ -87,6 +92,7 @@ final readonly class ContentSecurityPolicySubscriber
         private bool $stampNonces = true,
         private bool $debugRelaxations = true,
         private bool $reportOnly = false,
+        private array $nonceFreeStylePathPrefixes = [],
     ) {
     }
 
@@ -147,10 +153,13 @@ final readonly class ContentSecurityPolicySubscriber
 
     public function buildPolicy(Request $request, string $nonce): string
     {
+        $nonceFreeStyles = $this->matchesPathPrefix($request->getPathInfo(), $this->nonceFreeStylePathPrefixes);
         $sources = [];
         foreach ($this->directives as $directive => $base) {
             $sources[$directive] = $base;
-            if ('' !== $nonce && in_array($directive, self::NONCE_DIRECTIVES, true)) {
+            if ($nonceFreeStyles && 'style-src-elem' === $directive) {
+                $sources[$directive][] = "'unsafe-inline'";
+            } elseif ('' !== $nonce && in_array($directive, self::NONCE_DIRECTIVES, true)) {
                 $sources[$directive][] = "'nonce-".$nonce."'";
             }
             if ($this->kernelDebug && $this->debugRelaxations) {
@@ -219,6 +228,26 @@ final readonly class ContentSecurityPolicySubscriber
     {
         foreach ($this->excludedPathPrefixes as $prefix) {
             if ('' !== $prefix && str_starts_with($path, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Segment-aware prefix match: `/admin/legal` matches `/admin/legal` and `/admin/legal/…`, not `/admin/legalese`.
+     *
+     * @param list<string> $prefixes
+     */
+    private function matchesPathPrefix(string $path, array $prefixes): bool
+    {
+        foreach ($prefixes as $prefix) {
+            $prefix = rtrim($prefix, '/');
+            if ('' === $prefix) {
+                continue;
+            }
+            if ($path === $prefix || str_starts_with($path, $prefix.'/')) {
                 return true;
             }
         }

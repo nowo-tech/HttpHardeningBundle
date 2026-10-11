@@ -1,6 +1,6 @@
 # Feature specification — CSP nonce, public cache, canonical host, safe URLs
 
-**Status**: Implemented — unreleased (target **v1.1.0**)  
+**Status**: Implemented — **v1.1.0**  
 **Last audited:** 2026-10-09  
 **Extends:** [001-baseline](../001-baseline/spec.md)
 
@@ -27,7 +27,7 @@ Config root: `nowo_http_hardening` (`csp`, `public_cache`, `canonical_host`, `sa
 ## Non-goals
 
 - CSP violation report collection endpoint
-- Per-route / per-path policy overrides (only path exclusion)
+- Per-route / per-path policy overrides (only path exclusion; the narrow style-nonce relaxation is [003](../003-csp-nonce-free-style-paths/spec.md))
 - HTML sanitisation of CMS content
 - Shared-cache (CDN) caching of nonce'd HTML
 

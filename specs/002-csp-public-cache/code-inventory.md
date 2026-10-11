@@ -1,7 +1,7 @@
 # Code inventory — 002 CSP / public cache / canonical host / safe URLs
 
 **Last audited:** 2026-10-09  
-**Aligned with:** unreleased (target **v1.1.0**)
+**Aligned with:** **v1.1.0** (extended by [003](../003-csp-nonce-free-style-paths/code-inventory.md) in v1.2.0)  
 
 Production files added or extended by this feature. Baseline files are listed in [001-baseline/code-inventory.md](../001-baseline/code-inventory.md).
 

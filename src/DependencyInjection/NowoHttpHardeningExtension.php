@@ -120,6 +120,7 @@ final class NowoHttpHardeningExtension extends Extension
         $definition->setArgument('$stampNonces', (bool) $csp['stamp_nonces']);
         $definition->setArgument('$debugRelaxations', (bool) $csp['debug_relaxations']);
         $definition->setArgument('$reportOnly', (bool) $csp['report_only']);
+        $definition->setArgument('$nonceFreeStylePathPrefixes', array_values(array_map(strval(...), (array) $csp['nonce_free_style_path_prefixes'])));
         $definition->addTag('kernel.event_listener', [
             'event' => 'kernel.request',
             'method' => 'onRequest',

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-11
+
+### Added
+
+- `csp.nonce_free_style_path_prefixes` (default `[]`): on matching paths `style-src-elem` carries `'unsafe-inline'` instead of the nonce, for editors that inject `<style>` at runtime (CKEditor 5). Segment-aware prefix match; `script-src` keeps its nonce. Lets hosts drop their own CSP listener (spec `003`).
+
 ## [1.1.0] - 2026-10-09
 
 ### Added

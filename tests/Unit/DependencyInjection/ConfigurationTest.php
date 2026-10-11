@@ -29,6 +29,7 @@ final class ConfigurationTest extends TestCase
         self::assertTrue($config['csp']['stamp_nonces']);
         self::assertTrue($config['csp']['debug_relaxations']);
         self::assertSame(['/_wdt', '/_profiler'], $config['csp']['excluded_path_prefixes']);
+        self::assertSame([], $config['csp']['nonce_free_style_path_prefixes']);
         self::assertSame(["'self'"], $config['csp']['script_src']);
         self::assertSame(["'unsafe-inline'"], $config['csp']['style_src_attr']);
         self::assertSame([], $config['csp']['connect_src_extra']);

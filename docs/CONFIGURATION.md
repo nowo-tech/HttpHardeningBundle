@@ -43,6 +43,7 @@ Content-Security-Policy on HTML main responses. Off by default.
 | `stamp_nonces` | `true` | Add the nonce to inline `<script>` / `<style>` without one, unless `<html>` carries `data-csp-strict-nonce` |
 | `debug_relaxations` | `true` | With `kernel.debug`: `'unsafe-eval'` on `script-src`, `'unsafe-inline'` on `style-src-elem`, `ws: wss:` on `connect-src` |
 | `excluded_path_prefixes` | `['/_wdt', '/_profiler']` | Paths that never receive the header |
+| `nonce_free_style_path_prefixes` | `[]` | (v1.2+) Paths whose `style-src-elem` gets `'unsafe-inline'` **instead of** the nonce — routes that mount editors injecting `<style>` at runtime (CKEditor 5). Segment-aware prefix (`/admin/legal` matches `/admin/legal/…`, not `/admin/legalese`); `script-src` keeps its nonce |
 
 Directive sources (each is a list; setting it **replaces** the default; `[]` omits the directive). Every directive also has a `<key>_extra` list (default `[]`) that is **appended** — use it for env-driven origins (Sentry, CDNs) without restating the defaults.
 
