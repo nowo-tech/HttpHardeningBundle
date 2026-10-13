@@ -1,5 +1,17 @@
 # Upgrading
 
+## Table of contents
+
+- [Unreleased](#unreleased)
+- [From 1.2.0 to 1.3.0](#from-120-to-130)
+- [From 1.1.x to 1.2.0](#from-11x-to-120)
+- [From 1.0.x to 1.1.0](#from-10x-to-110)
+- [From 1.0.3 to 1.0.4](#from-103-to-104)
+- [From 1.0.2 to 1.0.3](#from-102-to-103)
+- [From 1.0.1 to 1.0.2](#from-101-to-102)
+- [From 1.0.0 to 1.0.1](#from-100-to-101)
+- [First install](#first-install)
+
 ## Unreleased
 
 ## From 1.2.0 to 1.3.0
