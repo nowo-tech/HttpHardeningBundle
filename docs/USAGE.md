@@ -103,6 +103,22 @@ nowo_http_hardening:
 
 Order on `kernel.response` (higher priority first): security headers (-80) → CSP (-100) → Symfony session listener (-1000) → strip (-1024) → public cache (-1100). Pages end up `private, max-age=120, must-revalidate` with `Vary: Cookie`, even when the strip made them `public` — a per-response nonce must not be shared by a CDN.
 
+## No-store paths
+
+```yaml
+nowo_http_hardening:
+    no_store:
+        enabled: true
+        path_patterns:
+            - '#^/(?:admin|settings|account)(?:/|$)#'
+            - '#^/projects/[^/]+/(?:keys|settings)(?:/|$)#'
+        routes: [app_export_config]
+```
+
+`/settings/mailer` → `Cache-Control: no-store, private`, no `ETag`, no `Last-Modified`. `/administrator` and `/projects/abc` are left alone. Anchor patterns (`^`) and end them on `(?:/|$)` to avoid matching look-alike paths.
+
+Full `kernel.response` order: security headers (-80) → CSP (-100) → session listener (-1000) → strip (-1024) → public cache (-1100) → no-store (-1200). A route listed both in `public_cache` and `no_store` ends up `no-store`.
+
 ## Canonical host
 
 ```yaml

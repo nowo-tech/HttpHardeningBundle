@@ -6,6 +6,7 @@ This bundle hardens HTTP **responses**:
 
 - Sets baseline security headers when missing (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Resource-Policy`, optional HSTS).
 - Optionally strips the session cookie on configured **anonymous** public GET/HEAD routes so CDNs and checkers see cacheable HTML.
+- Optionally forces `Cache-Control: no-store, private` (no `ETag` / `Last-Modified`) on configured sensitive paths / routes (`no_store`).
 
 It does **not** implement a full Content-Security-Policy, WAF, TLS termination, authentication, authorization, or XSS sanitization of HTML bodies. Those remain host / edge responsibilities.
 
@@ -24,6 +25,7 @@ It does **not** implement a full Content-Security-Policy, WAF, TLS termination, 
 | Accidental HSTS on loopback / local demos | Low — mitigated by `hsts_skip_loopback` (default true) |
 | Overwriting stronger headers already set by the app or edge | Low — subscribers use set-if-missing |
 | Stripping the session cookie on routes that still need anonymous session (CSRF forms, carts) | Medium if the host mis-lists public routes |
+| Credential pages stored by the browser or a proxy (back button, disk cache) | Medium if the host lists no `no_store` paths — mitigated by `no_store` (runs last, overrides every cache policy) |
 | Stripping cookies for authenticated users | Low — `UserInterface` tokens keep the session cookie |
 | Header injection via config | Low — config is operator-trusted, not end-user input |
 | XSS, CSRF, SSRF, SQL injection, path traversal, deserialization, RCE | Not applicable — no HTML render, no outbound HTTP, no file/CLI surface |
@@ -75,17 +77,18 @@ Confirm before each tag:
 | `docs/SECURITY.md` and `.github/SECURITY.md` exist and stay in English | Required |
 | `.env` is gitignored; no secrets in the tree | Required |
 | Flex recipe defaults are safe (`security_headers` on; `anonymous_session_strip` off) | Required |
+| `no_store` stays off by default; invalid path patterns fail the container build | Required |
 | Config is operator-trusted; no HTML output to escape | Required |
 | `composer audit` reviewed in CI | Required |
 | No secret logging | Required |
 | No custom cryptography | N/A |
 | No public endpoints / admin UI | N/A |
 | DoS / resource limits | N/A (no outbound I/O or subprocesses) |
-| AI security audit (REQ-SEC-004) | Pass (good), 2026-10-07 (reconfirmed for **v1.0.1**). Overall risk Low. No open Critical or High findings. |
+| AI security audit (REQ-SEC-004) | Pass (good), 2026-10-07 (reconfirmed for **v1.0.1**; `no_store` reviewed for **v1.4.0**, 2026-10-13). Overall risk Low. No open Critical or High findings. |
 
 ## AI security audit
 
-Static review of `src/`, the Flex recipe, and these security docs on **2026-10-07** (Cursor security-review + full-package pass). Reconfirmed for **v1.0.1** (docs + coverage only; no behaviour change).
+Static review of `src/`, the Flex recipe, and these security docs on **2026-10-07** (Cursor security-review + full-package pass). Reconfirmed for **v1.0.1** (docs + coverage only; no behaviour change). **v1.4.0** (2026-10-13): `NoStoreSubscriber` only removes cacheability headers; patterns are operator-owned config compiled at container build (no request-controlled regex).
 
 - **Grade:** Pass (good)
 - **Risk:** Low

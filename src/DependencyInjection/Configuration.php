@@ -10,6 +10,7 @@ use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
+use function is_string;
 use function sprintf;
 
 /**
@@ -66,6 +67,7 @@ final class Configuration implements ConfigurationInterface
 
         $this->addCspSection($root);
         $this->addPublicCacheSection($root);
+        $this->addNoStoreSection($root);
         $this->addCanonicalHostSection($root);
         $this->addSafeUrlsSection($root);
 
@@ -168,6 +170,48 @@ final class Configuration implements ConfigurationInterface
                     ->end()
                 ->end()
             ->end();
+    }
+
+    private function addNoStoreSection(ArrayNodeDefinition $root): void
+    {
+        $root
+            ->children()
+                ->arrayNode('no_store')
+                    ->info('Cache-Control: no-store, private (and no ETag / Last-Modified) on sensitive main requests.')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->booleanNode('enabled')->defaultFalse()->end()
+                        ->arrayNode('path_patterns')
+                            ->info('PCRE patterns (with delimiters) matched against Request::getPathInfo(), e.g. "#^/admin(?:/|$)#".')
+                            ->scalarPrototype()
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $pattern): bool => !self::isValidPattern($pattern))
+                                    ->thenInvalid('no_store.path_patterns entry %s is not a valid PCRE pattern (delimiters included, e.g. "#^/admin(?:/|$)#").')
+                                ->end()
+                            ->end()
+                            ->defaultValue([])
+                        ->end()
+                        ->arrayNode('routes')
+                            ->info('Exact route names (matched on the _route request attribute).')
+                            ->scalarPrototype()->end()
+                            ->defaultValue([])
+                        ->end()
+                    ->end()
+                ->end()
+            ->end();
+    }
+
+    /**
+     * Whether a no_store path pattern compiles (`preg_match` returns false and warns otherwise).
+     */
+    public static function isValidPattern(mixed $pattern): bool
+    {
+        if (!is_string($pattern) || '' === $pattern) {
+            return false;
+        }
+
+        // Config processing only (container build), never on the request path.
+        return false !== @preg_match($pattern, '');
     }
 
     private function addCanonicalHostSection(ArrayNodeDefinition $root): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\HttpHardeningBundle\Tests\Unit\DependencyInjection;
 
 use Nowo\HttpHardeningBundle\DependencyInjection\Configuration;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Processor;
@@ -40,6 +41,10 @@ final class ConfigurationTest extends TestCase
         self::assertSame('PHPSESSID', $config['public_cache']['session_cookie_name']);
         self::assertSame('REMEMBERME', $config['public_cache']['remember_me_cookie_name']);
 
+        self::assertFalse($config['no_store']['enabled']);
+        self::assertSame([], $config['no_store']['path_patterns']);
+        self::assertSame([], $config['no_store']['routes']);
+
         self::assertFalse($config['canonical_host']['enabled']);
         self::assertSame('', $config['canonical_host']['base_url']);
         self::assertSame(301, $config['canonical_host']['status_code']);
@@ -53,5 +58,42 @@ final class ConfigurationTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
 
         (new Processor())->processConfiguration(new Configuration(), [['canonical_host' => ['status_code' => 304]]]);
+    }
+
+    public function testNoStoreAcceptsValidPatterns(): void
+    {
+        $config = (new Processor())->processConfiguration(new Configuration(), [[
+            'no_store' => ['enabled' => true, 'path_patterns' => ['#^/admin(?:/|$)#'], 'routes' => ['app_keys']],
+        ]]);
+
+        self::assertSame(['#^/admin(?:/|$)#'], $config['no_store']['path_patterns']);
+        self::assertSame(['app_keys'], $config['no_store']['routes']);
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function invalidPatterns(): iterable
+    {
+        yield 'no delimiters' => ['^/admin'];
+        yield 'unbalanced group' => ['#^/(admin#'];
+        yield 'empty' => [''];
+    }
+
+    #[DataProvider('invalidPatterns')]
+    public function testNoStoreRejectsInvalidPatterns(mixed $pattern): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('is not a valid PCRE pattern');
+
+        (new Processor())->processConfiguration(new Configuration(), [[
+            'no_store' => ['enabled' => true, 'path_patterns' => [$pattern]],
+        ]]);
+    }
+
+    public function testIsValidPatternRejectsNonStrings(): void
+    {
+        self::assertFalse(Configuration::isValidPattern(null));
+        self::assertTrue(Configuration::isValidPattern('#^/a#'));
     }
 }

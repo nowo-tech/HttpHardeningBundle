@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.4.0] - 2026-10-13](#140---2026-10-13)
 - [[1.3.0] - 2026-10-13](#130---2026-10-13)
 - [[1.2.0] - 2026-10-11](#120---2026-10-11)
 - [[1.1.0] - 2026-10-09](#110---2026-10-09)
@@ -18,6 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-10-07](#100---2026-10-07)
 
 ## [Unreleased]
+
+## [1.4.0] - 2026-10-13
+
+### Added
+
+- **No-store paths** (`no_store`, opt-in): `NoStoreSubscriber` (`kernel.response` priority -1200, after the session listener, the anonymous session strip and public cache) sets `Cache-Control: no-store, private` and removes `ETag` / `Last-Modified` on main requests whose path matches `no_store.path_patterns` (PCRE, on `getPathInfo()`) or whose `_route` is in `no_store.routes`. Invalid patterns fail at container build with an `InvalidConfigurationException`. Registered once, only when enabled (spec `004`).
+
+### Dependencies
+
+- Dev lockfile: `nowo-tech/phpstan-frankenphp` 1.3.0; `symfony/yaml` listed under `packages-dev` (matches 1.3.0 `require-dev`). No runtime changes.
 
 ## [1.3.0] - 2026-10-13
 

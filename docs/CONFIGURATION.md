@@ -85,6 +85,18 @@ Cacheable `Cache-Control` for anonymous GET/HEAD 200 responses on listed routes 
 
 Signed-in users, responses that set cookies, non-200 responses and `no-store` are left alone. Pages lose their ETag when a CSP nonce was issued (a 304 would reuse an old nonce under a new header). An empty policy string disables that kind.
 
+## no_store
+
+`Cache-Control: no-store, private` on sensitive pages (credentials, API keys, exports). Off by default. Registers `NoStoreSubscriber` (`kernel.response` priority -1200) only when enabled.
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `enabled` | `false` | |
+| `path_patterns` | `[]` | PCRE patterns with delimiters, matched against `Request::getPathInfo()`, e.g. `'#^/admin(?:/\|$)#'`. Validated at container build: an invalid pattern throws `InvalidConfigurationException` |
+| `routes` | `[]` | Exact route names (`_route` attribute) |
+
+On a matching **main** request `Cache-Control` is replaced with `no-store, private` and `ETag` / `Last-Modified` are removed. Sub-requests are ignored. It runs after the session listener (-1000), `anonymous_session_strip` (-1024) and `public_cache` (-1100), so `no-store` always wins.
+
 ## canonical_host
 
 | Key | Default | Notes |

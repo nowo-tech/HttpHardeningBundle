@@ -11,12 +11,14 @@ use Nowo\HttpHardeningBundle\DependencyInjection\NowoHttpHardeningExtension;
 use Nowo\HttpHardeningBundle\EventSubscriber\AnonymousSessionCookieStripSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\CanonicalHostRedirectSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\ContentSecurityPolicySubscriber;
+use Nowo\HttpHardeningBundle\EventSubscriber\NoStoreSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\SecurityHeadersSubscriber;
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
 use Nowo\HttpHardeningBundle\Twig\CspNonceExtension;
 use Nowo\HttpHardeningBundle\Twig\SafeUrlExtension;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -171,6 +173,35 @@ final class NowoHttpHardeningExtensionTest extends TestCase
         self::assertLessThan($stripPriority, $cachePriority, 'Public cache must run after the strip subscriber.');
     }
 
+    public function testNoStoreIsOffByDefault(): void
+    {
+        $container = new ContainerBuilder();
+        (new NowoHttpHardeningExtension())->load([['no_store' => ['path_patterns' => ['#^/admin#']]]], $container);
+
+        self::assertFalse($container->hasDefinition(NoStoreSubscriber::class));
+    }
+
+    public function testLoadRegistersNoStoreWhenEnabled(): void
+    {
+        $container = new ContainerBuilder();
+        (new NowoHttpHardeningExtension())->load([[
+            'no_store' => ['enabled' => true, 'path_patterns' => ['#^/admin(?:/|$)#'], 'routes' => ['app_keys']],
+        ]], $container);
+
+        $definition = $container->getDefinition(NoStoreSubscriber::class);
+        self::assertSame(['#^/admin(?:/|$)#'], $definition->getArgument('$pathPatterns'));
+        self::assertSame(['app_keys'], $definition->getArgument('$routes'));
+        self::assertSame([['event' => 'kernel.response', 'method' => '__invoke', 'priority' => -1200]], $definition->getTag('kernel.event_listener'));
+    }
+
+    public function testInvalidNoStorePatternFailsContainerBuild(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('no_store.path_patterns');
+
+        (new NowoHttpHardeningExtension())->load([['no_store' => ['enabled' => true, 'path_patterns' => ['#(#']]]], new ContainerBuilder());
+    }
+
     public function testLoadRegistersCanonicalHostAndSafeUrlTwigFunctions(): void
     {
         $container = new ContainerBuilder();
@@ -223,8 +254,9 @@ final class NowoHttpHardeningExtensionTest extends TestCase
         (new NowoHttpHardeningExtension())->load([[
             'anonymous_session_strip' => ['enabled' => true, 'public_route_names' => ['home']],
             'public_cache' => ['enabled' => true, 'page_route_names' => ['home']],
+            'no_store' => ['enabled' => true, 'path_patterns' => ['#^/admin#']],
         ]], $container);
-        foreach ([SecurityHeadersSubscriber::class, AnonymousSessionCookieStripSubscriber::class, PublicCacheControlSubscriber::class] as $id) {
+        foreach ([SecurityHeadersSubscriber::class, AnonymousSessionCookieStripSubscriber::class, PublicCacheControlSubscriber::class, NoStoreSubscriber::class] as $id) {
             // Worst case: an app-level `_defaults: autoconfigure: true` reaching the bundle services.
             $container->getDefinition($id)->setAutoconfigured(true);
         }
@@ -243,9 +275,16 @@ final class NowoHttpHardeningExtensionTest extends TestCase
         self::assertSame(1, $counts[SecurityHeadersSubscriber::class] ?? 0);
         self::assertSame(1, $counts[AnonymousSessionCookieStripSubscriber::class] ?? 0);
         self::assertSame(1, $counts[PublicCacheControlSubscriber::class] ?? 0);
+        self::assertSame(1, $counts[NoStoreSubscriber::class] ?? 0);
         self::assertSame(-80, $dispatcher->getListenerPriority('kernel.response', $this->findListener($dispatcher, SecurityHeadersSubscriber::class)));
         self::assertSame(-1024, $dispatcher->getListenerPriority('kernel.response', $this->findListener($dispatcher, AnonymousSessionCookieStripSubscriber::class)));
-        self::assertCount(3, $counts);
+        self::assertSame(-1200, $dispatcher->getListenerPriority('kernel.response', $this->findListener($dispatcher, NoStoreSubscriber::class)));
+        self::assertLessThan(
+            $dispatcher->getListenerPriority('kernel.response', $this->findListener($dispatcher, PublicCacheControlSubscriber::class)),
+            $dispatcher->getListenerPriority('kernel.response', $this->findListener($dispatcher, NoStoreSubscriber::class)),
+            'no-store must run after public cache.',
+        );
+        self::assertCount(4, $counts);
     }
 
     public function testContainerCompilesWithoutSecurityBundle(): void

@@ -10,6 +10,7 @@ use Nowo\HttpHardeningBundle\Csp\InlineNonceLinter;
 use Nowo\HttpHardeningBundle\EventSubscriber\AnonymousSessionCookieStripSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\CanonicalHostRedirectSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\ContentSecurityPolicySubscriber;
+use Nowo\HttpHardeningBundle\EventSubscriber\NoStoreSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\SecurityHeadersSubscriber;
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
@@ -73,6 +74,7 @@ final class NowoHttpHardeningExtension extends Extension
 
         $this->loadCsp($config['csp'], $container);
         $this->loadPublicCache($config['public_cache'], $container);
+        $this->loadNoStore($config['no_store'], $container);
         $this->loadCanonicalHost($config['canonical_host'], $container);
         $this->loadSafeUrls($config['safe_urls'], $container);
     }
@@ -162,6 +164,27 @@ final class NowoHttpHardeningExtension extends Extension
             'priority' => -1100,
         ]);
         $container->setDefinition(PublicCacheControlSubscriber::class, $definition);
+    }
+
+    /**
+     * @param array<string, mixed> $noStore
+     */
+    private function loadNoStore(array $noStore, ContainerBuilder $container): void
+    {
+        if (!$noStore['enabled']) {
+            return;
+        }
+
+        $definition = new Definition(NoStoreSubscriber::class);
+        $definition->setArgument('$pathPatterns', array_values(array_map(strval(...), (array) $noStore['path_patterns'])));
+        $definition->setArgument('$routes', array_values(array_map(strval(...), (array) $noStore['routes'])));
+        // Last word on caching: after the session listener (-1000), the strip (-1024) and public cache (-1100).
+        $definition->addTag('kernel.event_listener', [
+            'event' => 'kernel.response',
+            'method' => '__invoke',
+            'priority' => NoStoreSubscriber::PRIORITY,
+        ]);
+        $container->setDefinition(NoStoreSubscriber::class, $definition);
     }
 
     /**

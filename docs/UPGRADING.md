@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [From 1.3.0 to 1.4.0](#from-130-to-140)
 - [From 1.2.0 to 1.3.0](#from-120-to-130)
 - [From 1.1.x to 1.2.0](#from-11x-to-120)
 - [From 1.0.x to 1.1.0](#from-10x-to-110)
@@ -13,6 +14,27 @@
 - [First install](#first-install)
 
 ## Unreleased
+
+## From 1.3.0 to 1.4.0
+
+No breaking changes; the new `no_store` section is off by default.
+
+```bash
+composer update nowo-tech/http-hardening-bundle
+```
+
+If the host has its own response listener that forces `no-store` on sensitive pages, move its pattern to config and delete the listener:
+
+```yaml
+nowo_http_hardening:
+    no_store:
+        enabled: true
+        path_patterns:
+            - '#^(?:/(?:admin|settings|account)(?:/|$)|/projects/[^/]+/(?:keys|settings)(?:/|$))#'
+        routes: []          # optional exact route names
+```
+
+Patterns are full PCRE strings with delimiters (as passed to `preg_match`). The subscriber runs at priority -1200, later than the old host listener at -1024; the resulting headers are the same (`Cache-Control: no-store, private`, no `ETag` / `Last-Modified`).
 
 ## From 1.2.0 to 1.3.0
 
