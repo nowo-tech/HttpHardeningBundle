@@ -45,7 +45,7 @@ final readonly class PublicCacheControlSubscriber
      * @param list<string> $fileRouteNames
      */
     public function __construct(
-        private TokenStorageInterface $tokenStorage,
+        private ?TokenStorageInterface $tokenStorage,
         private array $pageRouteNamePrefixes = [],
         private array $pageRouteNames = [],
         private string $pageCacheControl = self::DEFAULT_PAGE_CACHE_CONTROL,
@@ -70,7 +70,7 @@ final readonly class PublicCacheControlSubscriber
 
         $page = $this->classify($request);
         if (null === $page
-            || $this->tokenStorage->getToken()?->getUser() instanceof UserInterface
+            || $this->tokenStorage?->getToken()?->getUser() instanceof UserInterface
             || $response->headers->hasCacheControlDirective('no-store')
             || [] !== $response->headers->getCookies()) {
             return;

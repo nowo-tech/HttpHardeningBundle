@@ -40,8 +40,7 @@
         "symfony/dependency-injection": "^7.4 || ^8.0",
         "symfony/http-foundation": "^7.4 || ^8.0",
         "symfony/http-kernel": "^7.4 || ^8.0",
-        "symfony/security-core": "^7.4 || ^8.0",
-        "symfony/yaml": "^7.4 || ^8.0"
+        "symfony/security-core": "^7.4 || ^8.0"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.64",
@@ -55,6 +54,7 @@
         "rector/rector": "^2.0",
         "symfony/console": "^7.4 || ^8.0",
         "symfony/phpunit-bridge": "^7.4 || ^8.0",
+        "symfony/yaml": "^7.4 || ^8.0",
         "twig/twig": "^3.12"
     },
     "autoload": {
@@ -102,7 +102,7 @@
     },
     "suggest": {
         "symfony/flex": "For automatic recipe installation",
-        "symfony/security-bundle": "Required in the host app when anonymous_session_strip or public_cache is enabled",
+        "symfony/security-bundle": "Lets anonymous_session_strip / public_cache recognise signed-in users (without it every visitor is anonymous)",
         "symfony/console": "For the nowo:http-hardening:lint-csp-nonces command",
         "twig/twig": "For the csp_nonce() / |csp_stamp and safe_internal_path() / safe_href() Twig helpers"
     }

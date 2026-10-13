@@ -18,11 +18,21 @@ use Nowo\HttpHardeningBundle\Twig\CspNonceExtension;
 use Nowo\HttpHardeningBundle\Twig\SafeUrlExtension;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
+use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Symfony\Component\EventDispatcher\DependencyInjection\RegisterListenersPass;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
+
+use function is_array;
 
 final class NowoHttpHardeningExtensionTest extends TestCase
 {
@@ -199,6 +209,88 @@ final class NowoHttpHardeningExtensionTest extends TestCase
         $request = Request::create('/');
         $subscriber->onRequest(new RequestEvent($this->createStub(HttpKernelInterface::class), $request, HttpKernelInterface::MAIN_REQUEST));
         self::assertTrue($request->attributes->has('csp_nonce'));
+    }
+
+    public function testEachResponseListenerIsRegisteredExactlyOnce(): void
+    {
+        $container = new ContainerBuilder();
+        // Same attribute autoconfiguration FrameworkBundle performs for #[AsEventListener].
+        $container->registerAttributeForAutoconfiguration(AsEventListener::class, static function (ChildDefinition $definition, AsEventListener $attribute): void {
+            $definition->addTag('kernel.event_listener', get_object_vars($attribute));
+        });
+        $container->register('event_dispatcher', EventDispatcher::class)->setPublic(true);
+        $container->register('security.token_storage', TokenStorage::class);
+        (new NowoHttpHardeningExtension())->load([[
+            'anonymous_session_strip' => ['enabled' => true, 'public_route_names' => ['home']],
+            'public_cache' => ['enabled' => true, 'page_route_names' => ['home']],
+        ]], $container);
+        foreach ([SecurityHeadersSubscriber::class, AnonymousSessionCookieStripSubscriber::class, PublicCacheControlSubscriber::class] as $id) {
+            // Worst case: an app-level `_defaults: autoconfigure: true` reaching the bundle services.
+            $container->getDefinition($id)->setAutoconfigured(true);
+        }
+        $container->addCompilerPass(new RegisterListenersPass());
+        $container->compile();
+
+        $dispatcher = $container->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcher::class, $dispatcher);
+        $counts = [];
+        foreach ($dispatcher->getListeners('kernel.response') as $listener) {
+            $object = is_array($listener) ? $listener[0] : $listener;
+            self::assertIsObject($object);
+            $counts[$object::class] = ($counts[$object::class] ?? 0) + 1;
+        }
+
+        self::assertSame(1, $counts[SecurityHeadersSubscriber::class] ?? 0);
+        self::assertSame(1, $counts[AnonymousSessionCookieStripSubscriber::class] ?? 0);
+        self::assertSame(1, $counts[PublicCacheControlSubscriber::class] ?? 0);
+        self::assertSame(-80, $dispatcher->getListenerPriority('kernel.response', $this->findListener($dispatcher, SecurityHeadersSubscriber::class)));
+        self::assertSame(-1024, $dispatcher->getListenerPriority('kernel.response', $this->findListener($dispatcher, AnonymousSessionCookieStripSubscriber::class)));
+        self::assertCount(3, $counts);
+    }
+
+    public function testContainerCompilesWithoutSecurityBundle(): void
+    {
+        $container = new ContainerBuilder();
+        (new NowoHttpHardeningExtension())->load([[
+            'anonymous_session_strip' => ['enabled' => true, 'session_cookie_name' => 'PHPSESSID', 'public_route_names' => ['home']],
+            'public_cache' => ['enabled' => true, 'page_route_names' => ['home'], 'page_cache_control' => 'public, max-age=60'],
+        ]], $container);
+        self::assertFalse($container->has('security.token_storage'));
+        $container->getDefinition(AnonymousSessionCookieStripSubscriber::class)->setPublic(true);
+        $container->getDefinition(PublicCacheControlSubscriber::class)->setPublic(true);
+        $container->compile();
+
+        $strip = $container->get(AnonymousSessionCookieStripSubscriber::class);
+        $cache = $container->get(PublicCacheControlSubscriber::class);
+        self::assertInstanceOf(AnonymousSessionCookieStripSubscriber::class, $strip);
+        self::assertInstanceOf(PublicCacheControlSubscriber::class, $cache);
+
+        $request = Request::create('/');
+        $request->attributes->set('_route', 'home');
+        $response = new Response('ok');
+        $response->headers->setCookie(Cookie::create('PHPSESSID', 'abc'));
+        $event = new ResponseEvent($this->createStub(HttpKernelInterface::class), $request, HttpKernelInterface::MAIN_REQUEST, $response);
+        $strip($event);
+        $cache($event);
+
+        self::assertSame([], $response->headers->getCookies());
+        self::assertSame('max-age=60, public', $response->headers->get('Cache-Control'));
+    }
+
+    /**
+     * @param class-string $class
+     *
+     * @return callable|array<mixed>
+     */
+    private function findListener(EventDispatcher $dispatcher, string $class): callable|array
+    {
+        foreach ($dispatcher->getListeners('kernel.response') as $listener) {
+            if ((is_array($listener) ? $listener[0] : $listener) instanceof $class) {
+                return $listener;
+            }
+        }
+
+        self::fail('Listener '.$class.' not registered.');
     }
 }
 

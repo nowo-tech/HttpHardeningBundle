@@ -22,7 +22,7 @@ Existing response headers are never overwritten.
 
 | Key | Default | Notes |
 |-----|---------|-------|
-| `enabled` | `false` | Requires `security.token_storage` |
+| `enabled` | `false` | Uses `security.token_storage` when present (optional; without it every visitor is anonymous) |
 | `session_cookie_name` | `PHPSESSID` | Match the host session cookie |
 | `public_route_name_prefixes` | `[]` | e.g. `site_`, `legal_` |
 | `public_route_names` | `[]` | Exact route names |
@@ -70,7 +70,7 @@ An existing header of the same name (set by a controller or another listener) is
 
 ## public_cache
 
-Cacheable `Cache-Control` for anonymous GET/HEAD 200 responses on listed routes (priority -1100, after the session listener and `anonymous_session_strip`). Off by default; requires `security.token_storage`.
+Cacheable `Cache-Control` for anonymous GET/HEAD 200 responses on listed routes (priority -1100, after the session listener and `anonymous_session_strip`). Off by default; uses `security.token_storage` when present (optional).
 
 | Key | Default | Notes |
 |-----|---------|-------|

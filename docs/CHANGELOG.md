@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `SecurityHeadersSubscriber` and `AnonymousSessionCookieStripSubscriber` ran twice per response: they carried `#[AsEventListener]` and the extension also tagged them (`kernel.event_listener`) with autoconfigure on. The attributes and autoconfigure are gone; the extension tag is the single registration (priorities unchanged).
+- The container no longer fails to compile without SecurityBundle when `anonymous_session_strip` or `public_cache` is enabled: `security.token_storage` is an optional reference and both subscribers accept a null token storage (every visitor is then anonymous).
+
+### Changed
+
+- `symfony/yaml` moved from `require` to `require-dev` (not used by the bundle at runtime).
+
 ## [1.2.0] - 2026-10-11
 
 ### Added

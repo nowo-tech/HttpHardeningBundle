@@ -13,7 +13,7 @@ It does **not** implement a full Content-Security-Policy, WAF, TLS termination, 
 
 - Bundle configuration under `nowo_http_hardening` (header string values, HSTS flags, public route name lists).
 - Kernel `ResponseEvent` on main requests (no controllers, forms, CLI, admin UI, or Twig/JS assets).
-- Optional dependency on `security.token_storage` when `anonymous_session_strip.enabled` is true.
+- Optional dependency on `security.token_storage` when `anonymous_session_strip` or `public_cache` is enabled; without it every visitor is treated as anonymous.
 - No user-controlled request body parsing; header values come from developer-owned config only.
 
 ## Threat model
@@ -44,7 +44,7 @@ It does **not** implement a full Content-Security-Policy, WAF, TLS termination, 
 - Align `session_cookie_name` with the real Symfony session cookie name.
 - Supply a real CSP / COOP / COEP policy if the product needs one; this bundle does not invent a CSP.
 - Keep edge TLS and HSTS preload decisions at the reverse proxy when that is the source of truth; PHP still sets HSTS when missing so an older edge cannot drop it.
-- Require `symfony/security-bundle` (token storage) before enabling session strip.
+- Install `symfony/security-bundle` (token storage) before enabling session strip on an app with signed-in users; otherwise their session cookie is stripped on the listed routes too.
 
 ## Secrets and cryptography
 

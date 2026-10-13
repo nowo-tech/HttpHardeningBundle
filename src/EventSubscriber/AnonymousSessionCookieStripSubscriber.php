@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle\EventSubscriber;
 
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
-use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
@@ -18,12 +16,14 @@ use function is_string;
  * Public GET/HEAD pages must not emit the Symfony session cookie.
  *
  * Checkers and CDNs treat Set-Cookie + Cache-Control: private as uncacheable HTML.
- * Authenticated users (any UserInterface) keep the session cookie.
+ * Authenticated users (any UserInterface) keep the session cookie. Without SecurityBundle
+ * (no token storage) every visitor is anonymous.
+ *
+ * Registered on kernel.response (priority -1024) by NowoHttpHardeningExtension only.
  *
  * @author Héctor Franco Aceituno <hectorfranco@nowo.tech>
  * @copyright 2026 Nowo.tech
  */
-#[AsEventListener(event: KernelEvents::RESPONSE, priority: -1024)]
 final readonly class AnonymousSessionCookieStripSubscriber
 {
     /**
@@ -31,7 +31,7 @@ final readonly class AnonymousSessionCookieStripSubscriber
      * @param list<string> $publicRouteNames
      */
     public function __construct(
-        private TokenStorageInterface $tokenStorage,
+        private ?TokenStorageInterface $tokenStorage,
         private string $sessionCookieName,
         private array $publicRouteNamePrefixes = [],
         private array $publicRouteNames = [],
@@ -50,7 +50,7 @@ final readonly class AnonymousSessionCookieStripSubscriber
             return;
         }
 
-        if ($this->tokenStorage->getToken()?->getUser() instanceof UserInterface) {
+        if ($this->tokenStorage?->getToken()?->getUser() instanceof UserInterface) {
             return;
         }
 

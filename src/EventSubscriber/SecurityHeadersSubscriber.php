@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle\EventSubscriber;
 
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
-use Symfony\Component\HttpKernel\KernelEvents;
 
 use function in_array;
 
@@ -18,10 +16,11 @@ use function in_array;
  * Edge proxies may set the same keys; PHP still applies them so an older edge
  * cannot drop nosniff, Permissions-Policy, or CORP. HSTS skips loopback by default.
  *
+ * Registered on kernel.response (priority -80) by NowoHttpHardeningExtension only.
+ *
  * @author Héctor Franco Aceituno <hectorfranco@nowo.tech>
  * @copyright 2026 Nowo.tech
  */
-#[AsEventListener(event: KernelEvents::RESPONSE, priority: -80)]
 final class SecurityHeadersSubscriber
 {
     public function __construct(

@@ -39,8 +39,6 @@ final class NowoHttpHardeningExtension extends Extension
         $headers = $config['security_headers'];
         if ($headers['enabled']) {
             $definition = new Definition(SecurityHeadersSubscriber::class);
-            $definition->setAutowired(true);
-            $definition->setAutoconfigured(true);
             $definition->setArgument('$xContentTypeOptions', (string) $headers['x_content_type_options']);
             $definition->setArgument('$xFrameOptions', (string) $headers['x_frame_options']);
             $definition->setArgument('$referrerPolicy', (string) $headers['referrer_policy']);
@@ -60,9 +58,7 @@ final class NowoHttpHardeningExtension extends Extension
         $strip = $config['anonymous_session_strip'];
         if ($strip['enabled']) {
             $definition = new Definition(AnonymousSessionCookieStripSubscriber::class);
-            $definition->setAutowired(true);
-            $definition->setAutoconfigured(true);
-            $definition->setArgument('$tokenStorage', new Reference('security.token_storage'));
+            $definition->setArgument('$tokenStorage', new Reference('security.token_storage', ContainerBuilder::NULL_ON_INVALID_REFERENCE));
             $definition->setArgument('$sessionCookieName', (string) $strip['session_cookie_name']);
             $definition->setArgument('$publicRouteNamePrefixes', array_values($strip['public_route_name_prefixes']));
             $definition->setArgument('$publicRouteNames', array_values($strip['public_route_names']));
@@ -151,7 +147,7 @@ final class NowoHttpHardeningExtension extends Extension
         }
 
         $definition = new Definition(PublicCacheControlSubscriber::class);
-        $definition->setArgument('$tokenStorage', new Reference('security.token_storage'));
+        $definition->setArgument('$tokenStorage', new Reference('security.token_storage', ContainerBuilder::NULL_ON_INVALID_REFERENCE));
         $definition->setArgument('$pageRouteNamePrefixes', array_values((array) $cache['page_route_name_prefixes']));
         $definition->setArgument('$pageRouteNames', array_values((array) $cache['page_route_names']));
         $definition->setArgument('$pageCacheControl', (string) $cache['page_cache_control']);

@@ -1,5 +1,13 @@
 # Upgrading
 
+## Unreleased
+
+No configuration changes.
+
+- `symfony/yaml` is no longer a runtime requirement; require it in your app if you relied on the bundle pulling it in (Symfony Flex apps already do).
+- `SecurityHeadersSubscriber` / `AnonymousSessionCookieStripSubscriber` no longer carry `#[AsEventListener]`; they are registered once by the bundle extension. If you registered either class yourself as a service, add the `kernel.event_listener` tag explicitly.
+- `security.token_storage` is now optional for `anonymous_session_strip` and `public_cache`.
+
 ## From 1.1.x to 1.2.0
 
 No breaking changes; the new key defaults to `[]`.

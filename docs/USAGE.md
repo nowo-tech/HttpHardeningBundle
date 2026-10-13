@@ -23,7 +23,7 @@ nowo_http_hardening:
 
 Authenticated users (`UserInterface`) keep the session cookie. Other cookies (consent, etc.) are preserved.
 
-Requires `security.token_storage` in the host application. Do not list routes that still need an anonymous session (login CSRF, carts). See [SECURITY.md](SECURITY.md).
+Uses `security.token_storage` when present to keep the cookie for signed-in users; without SecurityBundle every visitor is treated as anonymous. Do not list routes that still need an anonymous session (login CSRF, carts). See [SECURITY.md](SECURITY.md).
 
 ## Content-Security-Policy
 
