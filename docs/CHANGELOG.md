@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-13
+
 ### Fixed
 
 - `SecurityHeadersSubscriber` and `AnonymousSessionCookieStripSubscriber` ran twice per response: they carried `#[AsEventListener]` and the extension also tagged them (`kernel.event_listener`) with autoconfigure on. The attributes and autoconfigure are gone; the extension tag is the single registration (priorities unchanged).

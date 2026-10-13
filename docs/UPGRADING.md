@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## From 1.2.0 to 1.3.0
+
+From **1.2.0** — listeners registered once; security token storage optional; symfony/yaml dev-only.
+
+```bash
+composer update nowo-tech/http-hardening-bundle
+```
+
 No configuration changes.
 
 - `symfony/yaml` is no longer a runtime requirement; require it in your app if you relied on the bundle pulling it in (Symfony Flex apps already do).
