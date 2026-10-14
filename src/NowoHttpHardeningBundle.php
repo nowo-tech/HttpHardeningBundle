@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle;
 
+use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\WebProfilerCspHandlerPass;
 use Nowo\HttpHardeningBundle\DependencyInjection\NowoHttpHardeningExtension;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
@@ -16,6 +18,13 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
  */
 class NowoHttpHardeningBundle extends Bundle
 {
+    public function build(ContainerBuilder $container): void
+    {
+        parent::build($container);
+
+        $container->addCompilerPass(new WebProfilerCspHandlerPass());
+    }
+
     public function getContainerExtension(): ?ExtensionInterface
     {
         if (null === $this->extension) {

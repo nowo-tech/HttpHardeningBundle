@@ -114,3 +114,13 @@ Only `www.<apex>` is redirected (to the apex, path + query kept). Loopback / `*.
 | `twig_functions` | `false` | Register `safe_internal_path(target, fallback = '/')` and `safe_href(href)` (requires `twig/twig`) |
 
 The `Nowo\HttpHardeningBundle\Http\SafeInternalRedirect` service is always registered (stateless).
+
+## web_profiler
+
+(v1.5+) Fix for WebProfilerBundle in long-running workers. No-op when WebProfilerBundle is not installed or not enabled (prod).
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `isolate_csp_handler` | `true` | Make `web_profiler.csp.handler` non-shared (compiler pass `WebProfilerCspHandlerPass`) |
+
+Why: WebProfilerBundle's `ContentSecurityPolicyHandler` keeps a `cspDisabled` flag that `ProfilerController` sets on `/_wdt/styles` and `/_profiler` pages and never resets. The service is shared, so the toolbar listener uses the same instance. In FrankenPHP worker mode (or any runtime that keeps the kernel between requests), once a worker has served a profiler request every later page loses its `Content-Security-Policy` header and the toolbar's inline `<script>` renders without a nonce. Non-shared, each consumer gets its own handler. The profiler paths never get a CSP from this bundle anyway (`csp.excluded_path_prefixes`). Set it to `false` only if you decorate or replace that service yourself.

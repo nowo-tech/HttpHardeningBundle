@@ -78,17 +78,18 @@ Confirm before each tag:
 | `.env` is gitignored; no secrets in the tree | Required |
 | Flex recipe defaults are safe (`security_headers` on; `anonymous_session_strip` off) | Required |
 | `no_store` stays off by default; invalid path patterns fail the container build | Required |
+| `web_profiler.isolate_csp_handler` only touches `web_profiler.csp.handler` when it exists (dev/test) | Required |
 | Config is operator-trusted; no HTML output to escape | Required |
 | `composer audit` reviewed in CI | Required |
 | No secret logging | Required |
 | No custom cryptography | N/A |
 | No public endpoints / admin UI | N/A |
-| DoS / resource limits | N/A (no outbound I/O or subprocesses) |
-| AI security audit (REQ-SEC-004) | Pass (good), 2026-10-07 (reconfirmed for **v1.0.1**; `no_store` reviewed for **v1.4.0**, 2026-10-13). Overall risk Low. No open Critical or High findings. |
+| DoS / resource limits | `BoundedRequestBody` caps raw body reads (cap + 1 bytes max); no outbound I/O or subprocesses |
+| AI security audit (REQ-SEC-004) | Pass (good), 2026-10-07 (reconfirmed for **v1.0.1**; `no_store` reviewed for **v1.4.0**, 2026-10-13; `BoundedRequestBody` and the profiler CSP pass reviewed for **v1.5.0**, 2026-10-14). Overall risk Low. No open Critical or High findings. |
 
 ## AI security audit
 
-Static review of `src/`, the Flex recipe, and these security docs on **2026-10-07** (Cursor security-review + full-package pass). Reconfirmed for **v1.0.1** (docs + coverage only; no behaviour change). **v1.4.0** (2026-10-13): `NoStoreSubscriber` only removes cacheability headers; patterns are operator-owned config compiled at container build (no request-controlled regex).
+Static review of `src/`, the Flex recipe, and these security docs on **2026-10-07** (Cursor security-review + full-package pass). Reconfirmed for **v1.0.1** (docs + coverage only; no behaviour change). **v1.4.0** (2026-10-13): `NoStoreSubscriber` only removes cacheability headers; patterns are operator-owned config compiled at container build (no request-controlled regex). **v1.5.0** (2026-10-14): `BoundedRequestBody` rejects a declared oversize `Content-Length` before reading and never reads more than cap + 1 bytes; `WebProfilerCspHandlerPass` only changes the dev-only profiler handler to non-shared, which restores the CSP header in worker mode.
 
 - **Grade:** Pass (good)
 - **Risk:** Low

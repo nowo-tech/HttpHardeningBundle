@@ -7,6 +7,7 @@ namespace Nowo\HttpHardeningBundle\Tests\Unit\DependencyInjection;
 use Nowo\HttpHardeningBundle\Command\LintCspNoncesCommand;
 use Nowo\HttpHardeningBundle\Csp\CspSourceProviderInterface;
 use Nowo\HttpHardeningBundle\Csp\InlineNonceLinter;
+use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\WebProfilerCspHandlerPass;
 use Nowo\HttpHardeningBundle\DependencyInjection\NowoHttpHardeningExtension;
 use Nowo\HttpHardeningBundle\EventSubscriber\AnonymousSessionCookieStripSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\CanonicalHostRedirectSubscriber;
@@ -314,6 +315,17 @@ final class NowoHttpHardeningExtensionTest extends TestCase
 
         self::assertSame([], $response->headers->getCookies());
         self::assertSame('max-age=60, public', $response->headers->get('Cache-Control'));
+    }
+
+    public function testLoadExposesWebProfilerIsolationSwitch(): void
+    {
+        $container = new ContainerBuilder();
+        (new NowoHttpHardeningExtension())->load([], $container);
+        self::assertTrue($container->getParameter(WebProfilerCspHandlerPass::ENABLED_PARAMETER));
+
+        $container = new ContainerBuilder();
+        (new NowoHttpHardeningExtension())->load([['web_profiler' => ['isolate_csp_handler' => false]]], $container);
+        self::assertFalse($container->getParameter(WebProfilerCspHandlerPass::ENABLED_PARAMETER));
     }
 
     /**

@@ -70,6 +70,7 @@ final class Configuration implements ConfigurationInterface
         $this->addNoStoreSection($root);
         $this->addCanonicalHostSection($root);
         $this->addSafeUrlsSection($root);
+        $this->addWebProfilerSection($root);
 
         return $treeBuilder;
     }
@@ -249,6 +250,22 @@ final class Configuration implements ConfigurationInterface
                         ->booleanNode('twig_functions')
                             ->info('Register safe_internal_path() and safe_href() Twig functions (requires twig/twig).')
                             ->defaultFalse()
+                        ->end()
+                    ->end()
+                ->end()
+            ->end();
+    }
+
+    private function addWebProfilerSection(ArrayNodeDefinition $root): void
+    {
+        $root
+            ->children()
+                ->arrayNode('web_profiler')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->booleanNode('isolate_csp_handler')
+                            ->info('Make WebProfilerBundle\'s web_profiler.csp.handler non-shared so a /_wdt or /_profiler request cannot strip the CSP header from later pages in a long-running worker (FrankenPHP worker mode). No-op without WebProfilerBundle.')
+                            ->defaultTrue()
                         ->end()
                     ->end()
                 ->end()

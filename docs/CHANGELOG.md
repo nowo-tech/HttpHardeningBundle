@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.5.0] - 2026-10-14](#150---2026-10-14)
 - [[1.4.0] - 2026-10-13](#140---2026-10-13)
 - [[1.3.0] - 2026-10-13](#130---2026-10-13)
 - [[1.2.0] - 2026-10-11](#120---2026-10-11)
@@ -19,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-10-07](#100---2026-10-07)
 
 ## [Unreleased]
+
+## [1.5.0] - 2026-10-14
+
+### Added
+
+- **Bounded request body**: `Nowo\HttpHardeningBundle\Http\BoundedRequestBody::read(Request $request, int $maxBytes): string` rejects a `Content-Length` above the cap before reading, otherwise streams at most cap + 1 bytes (chunked bodies without `Content-Length` included) and throws `Http\Exception\RequestBodyTooLargeException` (an `HttpException`, status 413, with `getMaxBytes()` / `isDeclared()`). `tryRead()` returns `null` instead (spec `005`).
+- **Worker-safe Web Profiler CSP handler**: `WebProfilerCspHandlerPass` makes WebProfilerBundle's `web_profiler.csp.handler` non-shared, so a `/_wdt` or `/_profiler` request no longer strips `Content-Security-Policy` (and toolbar nonces) from later pages in FrankenPHP worker mode. New key `web_profiler.isolate_csp_handler` (default `true`); no-op without WebProfilerBundle (spec `005`).
+
+### Dependencies
+
+- Lockfile refresh from `composer update --no-install` (Symfony components 7.4.21, `symfony/phpunit-bridge` 8.1.9). No constraint changes.
 
 ## [1.4.0] - 2026-10-13
 

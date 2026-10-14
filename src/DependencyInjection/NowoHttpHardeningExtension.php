@@ -7,6 +7,7 @@ namespace Nowo\HttpHardeningBundle\DependencyInjection;
 use Nowo\HttpHardeningBundle\Command\LintCspNoncesCommand;
 use Nowo\HttpHardeningBundle\Csp\CspSourceProviderInterface;
 use Nowo\HttpHardeningBundle\Csp\InlineNonceLinter;
+use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\WebProfilerCspHandlerPass;
 use Nowo\HttpHardeningBundle\EventSubscriber\AnonymousSessionCookieStripSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\CanonicalHostRedirectSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\ContentSecurityPolicySubscriber;
@@ -77,6 +78,8 @@ final class NowoHttpHardeningExtension extends Extension
         $this->loadNoStore($config['no_store'], $container);
         $this->loadCanonicalHost($config['canonical_host'], $container);
         $this->loadSafeUrls($config['safe_urls'], $container);
+
+        $container->setParameter(WebProfilerCspHandlerPass::ENABLED_PARAMETER, (bool) $config['web_profiler']['isolate_csp_handler']);
     }
 
     /**

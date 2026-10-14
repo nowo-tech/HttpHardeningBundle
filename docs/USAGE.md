@@ -130,6 +130,29 @@ nowo_http_hardening:
 
 `https://www.example.com/contact?x=1` → `301 https://example.com/contact?x=1`. The edge must still serve a valid certificate for `www`.
 
+## Bounded request body
+
+For endpoints that read a raw body (webhooks, ingest, JSON APIs), read it with a hard byte cap instead of `$request->getContent()`, which buffers the whole body first:
+
+```php
+use Nowo\HttpHardeningBundle\Http\BoundedRequestBody;
+use Nowo\HttpHardeningBundle\Http\Exception\RequestBodyTooLargeException;
+
+$body = BoundedRequestBody::read($request, 1_048_576); // throws RequestBodyTooLargeException (413)
+
+// or, to build your own response:
+$body = BoundedRequestBody::tryRead($request, 1_048_576);
+if (null === $body) {
+    return new Response('payload too large', Response::HTTP_REQUEST_ENTITY_TOO_LARGE);
+}
+```
+
+A `Content-Length` above the cap is rejected before a byte is read. Without one (chunked transfer) or with an understated one, at most cap + 1 bytes are read. Uncaught, `RequestBodyTooLargeException` is an `HttpException`, so Symfony renders a 413. `getMaxBytes()` and `isDeclared()` (rejected on `Content-Length`) help with logging. A cap below 1 means 1. Keep an edge limit too (Caddy `request_body`, nginx `client_max_body_size`); multipart forms are buffered by PHP before the kernel runs.
+
+## Web Profiler in worker mode
+
+Nothing to do: in dev the bundle makes WebProfilerBundle's `web_profiler.csp.handler` non-shared, so the CSP header and toolbar nonces survive `/_wdt` and `/_profiler` requests in FrankenPHP worker mode. Remove any host override of that service (`shared: false` in `when@dev`). See [Configuration — web_profiler](CONFIGURATION.md#web_profiler).
+
 ## Safe internal redirects
 
 ```php

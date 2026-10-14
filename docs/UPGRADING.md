@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [From 1.4.0 to 1.5.0](#from-140-to-150)
 - [From 1.3.0 to 1.4.0](#from-130-to-140)
 - [From 1.2.0 to 1.3.0](#from-120-to-130)
 - [From 1.1.x to 1.2.0](#from-11x-to-120)
@@ -14,6 +15,28 @@
 - [First install](#first-install)
 
 ## Unreleased
+
+## From 1.4.0 to 1.5.0
+
+No breaking changes.
+
+```bash
+composer update nowo-tech/http-hardening-bundle
+```
+
+- **Web Profiler CSP handler (dev only).** The bundle now makes `web_profiler.csp.handler` non-shared (`web_profiler.isolate_csp_handler`, default `true`). Delete a host override like this one (in `config/packages/web_profiler.yaml` or `config/services.yaml`, `when@dev`):
+
+  ```yaml
+  web_profiler.csp.handler:
+      class: Symfony\Bundle\WebProfilerBundle\Csp\ContentSecurityPolicyHandler
+      shared: false
+      arguments:
+          - !service { class: Symfony\Bundle\WebProfilerBundle\Csp\NonceGenerator }
+  ```
+
+  Keeping it is harmless (same result). Prod containers have no profiler, so nothing changes there. Opt out with `web_profiler: { isolate_csp_handler: false }`.
+
+- **Bounded request body.** If the host has its own capped body reader, replace it with `Nowo\HttpHardeningBundle\Http\BoundedRequestBody`. A helper that returned `null` on oversize maps to `BoundedRequestBody::tryRead($request, $maxBytes)`; `read()` throws `RequestBodyTooLargeException` (413) instead.
 
 ## From 1.3.0 to 1.4.0
 

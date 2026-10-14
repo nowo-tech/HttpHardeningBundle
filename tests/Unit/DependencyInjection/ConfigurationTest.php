@@ -50,6 +50,7 @@ final class ConfigurationTest extends TestCase
         self::assertSame(301, $config['canonical_host']['status_code']);
 
         self::assertFalse($config['safe_urls']['twig_functions']);
+        self::assertTrue($config['web_profiler']['isolate_csp_handler']);
         self::assertSame('frame_ancestors', Configuration::cspKey('frame-ancestors'));
     }
 
@@ -95,5 +96,14 @@ final class ConfigurationTest extends TestCase
     {
         self::assertFalse(Configuration::isValidPattern(null));
         self::assertTrue(Configuration::isValidPattern('#^/a#'));
+    }
+
+    public function testWebProfilerIsolationCanBeDisabled(): void
+    {
+        $config = (new Processor())->processConfiguration(new Configuration(), [[
+            'web_profiler' => ['isolate_csp_handler' => false],
+        ]]);
+
+        self::assertFalse($config['web_profiler']['isolate_csp_handler']);
     }
 }
