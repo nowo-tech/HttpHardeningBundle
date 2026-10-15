@@ -16,6 +16,8 @@
 
 ## Unreleased
 
+- Optional: replace `%env(default::SYMFONY_TRUSTED_HOSTS)%` (or a host env var processor) with `%env(nowo_trusted_hosts:SYMFONY_TRUSTED_HOSTS)%` and set `nowo_http_hardening.trusted_hosts.internal_hosts` — see CONFIGURATION.md § trusted_hosts.
+
 ## From 1.4.0 to 1.5.0
 
 No breaking changes.

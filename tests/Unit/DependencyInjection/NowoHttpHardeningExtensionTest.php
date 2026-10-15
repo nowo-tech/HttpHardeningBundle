@@ -16,6 +16,7 @@ use Nowo\HttpHardeningBundle\EventSubscriber\NoStoreSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\SecurityHeadersSubscriber;
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
+use Nowo\HttpHardeningBundle\Http\TrustedHostsEnvVarProcessor;
 use Nowo\HttpHardeningBundle\Twig\CspNonceExtension;
 use Nowo\HttpHardeningBundle\Twig\SafeUrlExtension;
 use PHPUnit\Framework\TestCase;
@@ -201,6 +202,25 @@ final class NowoHttpHardeningExtensionTest extends TestCase
         $this->expectExceptionMessage('no_store.path_patterns');
 
         (new NowoHttpHardeningExtension())->load([['no_store' => ['enabled' => true, 'path_patterns' => ['#(#']]]], new ContainerBuilder());
+    }
+
+    public function testLoadRegistersTheTrustedHostsEnvVarProcessor(): void
+    {
+        $bare = new ContainerBuilder();
+        (new NowoHttpHardeningExtension())->load([[]], $bare);
+        self::assertSame('prod', $bare->getDefinition(TrustedHostsEnvVarProcessor::class)->getArgument('$environment'));
+
+        $container = new ContainerBuilder();
+        $container->setParameter('kernel.environment', 'prod');
+        (new NowoHttpHardeningExtension())->load([['trusted_hosts' => ['internal_hosts' => ['app-php']]]], $container);
+
+        $definition = $container->getDefinition(TrustedHostsEnvVarProcessor::class);
+        self::assertTrue($definition->hasTag('container.env_var_processor'));
+        self::assertSame('%kernel.environment%', $definition->getArgument('$environment'));
+        self::assertSame('TRUSTED_HOSTS', $definition->getArgument('$fallbackEnv'));
+        self::assertSame('DEFAULT_URI', $definition->getArgument('$publicUrlEnv'));
+        self::assertSame(['app-php'], $definition->getArgument('$internalHosts'));
+        self::assertSame(['dev', 'test'], $definition->getArgument('$localEnvironments'));
     }
 
     public function testLoadRegistersCanonicalHostAndSafeUrlTwigFunctions(): void

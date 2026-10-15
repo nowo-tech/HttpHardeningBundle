@@ -97,6 +97,26 @@ Signed-in users, responses that set cookies, non-200 responses and `no-store` ar
 
 On a matching **main** request `Cache-Control` is replaced with `no-store, private` and `ETag` / `Last-Modified` are removed. Sub-requests are ignored. It runs after the session listener (-1000), `anonymous_session_strip` (-1024) and `public_cache` (-1100), so `no-store` always wins.
 
+## trusted_hosts
+
+Env var processor `%env(nowo_trusted_hosts:SYMFONY_TRUSTED_HOSTS)%` so production never runs without a Host allowlist:
+
+```yaml
+# config/packages/framework.yaml
+framework:
+    trusted_hosts: '%env(nowo_trusted_hosts:SYMFONY_TRUSTED_HOSTS)%'
+
+# config/packages/nowo_http_hardening.yaml
+nowo_http_hardening:
+    trusted_hosts:
+        fallback_env: TRUSTED_HOSTS          # devops-written regex, used when SYMFONY_TRUSTED_HOSTS is empty
+        public_url_env: DEFAULT_URI          # host derived from this URL outside local_environments
+        internal_hosts: [app-php, localhost, 127.0.0.1]   # container alias + loopback probes (plain names)
+        local_environments: [dev, test]      # keep the list empty (any Host) here when nothing is set
+```
+
+Resolution: the named variable → `fallback_env` → (outside `local_environments`) `^(?:<public host>|<internal hosts>)$` → empty. A request with any other `Host` answers 400 (Symfony). Prefer this over `%env(default::SYMFONY_TRUSTED_HOSTS)%`, which leaves the list empty in production when the variable is missing.
+
 ## canonical_host
 
 | Key | Default | Notes |

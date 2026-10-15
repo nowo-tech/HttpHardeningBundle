@@ -15,6 +15,7 @@ use Nowo\HttpHardeningBundle\EventSubscriber\NoStoreSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\SecurityHeadersSubscriber;
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
+use Nowo\HttpHardeningBundle\Http\TrustedHostsEnvVarProcessor;
 use Nowo\HttpHardeningBundle\Twig\CspNonceExtension;
 use Nowo\HttpHardeningBundle\Twig\SafeUrlExtension;
 use Symfony\Component\Console\Command\Command;
@@ -77,6 +78,7 @@ final class NowoHttpHardeningExtension extends Extension
         $this->loadPublicCache($config['public_cache'], $container);
         $this->loadNoStore($config['no_store'], $container);
         $this->loadCanonicalHost($config['canonical_host'], $container);
+        $this->loadTrustedHosts($config['trusted_hosts'], $container);
         $this->loadSafeUrls($config['safe_urls'], $container);
 
         $container->setParameter(WebProfilerCspHandlerPass::ENABLED_PARAMETER, (bool) $config['web_profiler']['isolate_csp_handler']);
@@ -188,6 +190,22 @@ final class NowoHttpHardeningExtension extends Extension
             'priority' => NoStoreSubscriber::PRIORITY,
         ]);
         $container->setDefinition(NoStoreSubscriber::class, $definition);
+    }
+
+    /**
+     * @param array<string, mixed> $trustedHosts
+     */
+    private function loadTrustedHosts(array $trustedHosts, ContainerBuilder $container): void
+    {
+        $definition = new Definition(TrustedHostsEnvVarProcessor::class);
+        // Bare containers (tests, tools) without the kernel parameters fall back to the strict side.
+        $definition->setArgument('$environment', $container->hasParameter('kernel.environment') ? '%kernel.environment%' : 'prod');
+        $definition->setArgument('$fallbackEnv', (string) $trustedHosts['fallback_env']);
+        $definition->setArgument('$publicUrlEnv', (string) $trustedHosts['public_url_env']);
+        $definition->setArgument('$internalHosts', array_values($trustedHosts['internal_hosts']));
+        $definition->setArgument('$localEnvironments', array_values($trustedHosts['local_environments']));
+        $definition->addTag('container.env_var_processor');
+        $container->setDefinition(TrustedHostsEnvVarProcessor::class, $definition);
     }
 
     /**

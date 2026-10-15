@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`nowo_trusted_hosts` env var processor (`trusted_hosts.*`).** `%env(nowo_trusted_hosts:SYMFONY_TRUSTED_HOSTS)%` for `framework.trusted_hosts`: the named variable, then `fallback_env` (`TRUSTED_HOSTS`), then — outside `local_environments` — a regex derived from the host of `public_url_env` (`DEFAULT_URI`) plus `internal_hosts`, so production never runs with an empty Host allowlist (Nowo REQ-HDR-006 item 1). Apps can drop their host processor.
+
 ## [1.5.0] - 2026-10-14
 
 ### Added
