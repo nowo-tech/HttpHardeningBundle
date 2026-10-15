@@ -12,6 +12,7 @@
 - Do not log raw URLs or DNS answers (they may contain secrets).
 - Document config/API changes in `docs/` and `docs/CHANGELOG.md`.
 - Do **not** add `Co-authored-by: Cursor` or `cursoragent@cursor.com` trailers to commit messages.
+- Never add `Co-Authored-By: Claude …` / `noreply@anthropic.com` trailers either (REQ-GIT-001).
 
 ## Quality
 
