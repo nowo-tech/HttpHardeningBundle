@@ -168,3 +168,19 @@ Absolute same-host URLs are reduced to path + query; protocol-relative URLs, bac
 <a href="{{ safe_internal_path(app.request.query.get('next'), '/') }}">Back</a>
 {% set href = safe_href(block.link) %}{% if href %}<a href="{{ href }}">…</a>{% endif %}
 ```
+
+## Bounded JSON uploads
+
+```php
+use Nowo\HttpHardeningBundle\Http\Exception\JsonUploadException;
+use Nowo\HttpHardeningBundle\Http\JsonUpload;
+
+try {
+    $payload = JsonUpload::decodeObject($form->get('file')->getData(), maxBytes: 2_097_152);
+} catch (JsonUploadException $e) {
+    $this->addFlash('error', 'import.error.'.$e->reason); // missing_file | too_large | invalid_json
+}
+```
+
+The declared upload size is checked first and the file is read at most to the cap + 1 byte, so a large upload never fills worker memory; only a JSON **object** is accepted.
+
