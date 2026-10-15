@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.6.0](#to-160)
 - [From 1.4.0 to 1.5.0](#from-140-to-150)
 - [From 1.3.0 to 1.4.0](#from-130-to-140)
 - [From 1.2.0 to 1.3.0](#from-120-to-130)
@@ -15,6 +16,8 @@
 - [First install](#first-install)
 
 ## Unreleased
+
+## To 1.6.0
 
 - Optional: replace `%env(default::SYMFONY_TRUSTED_HOSTS)%` (or a host env var processor) with `%env(nowo_trusted_hosts:SYMFONY_TRUSTED_HOSTS)%` and set `nowo_http_hardening.trusted_hosts.internal_hosts` — see CONFIGURATION.md § trusted_hosts.
 
