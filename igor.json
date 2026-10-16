@@ -1,5 +1,14 @@
 {
   "paths": ["src"],
+  "exclude": [
+    "demo",
+    "tests",
+    "vendor",
+    "var",
+    "coverage",
+    ".git",
+    "node_modules"
+  ],
   "safe_namespaces": [
     "Nowo\\HttpHardeningBundle\\DependencyInjection\\"
   ],
