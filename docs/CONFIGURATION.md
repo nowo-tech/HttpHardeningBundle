@@ -97,6 +97,19 @@ Signed-in users, responses that set cookies, non-200 responses and `no-store` ar
 
 On a matching **main** request `Cache-Control` is replaced with `no-store, private` and `ETag` / `Last-Modified` are removed. Sub-requests are ignored. It runs after the session listener (-1000), `anonymous_session_strip` (-1024) and `public_cache` (-1100), so `no-store` always wins.
 
+## tenant_existence_mask
+
+No existence oracle on tenant URLs. Off by default. Registers `TenantExistenceMaskSubscriber` (`kernel.exception`, priority 16 — before the firewall `ExceptionListener` at 1) only when enabled.
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `enabled` | `false` | `true` requires at least one `path_patterns` entry |
+| `path_patterns` | `[]` | PCRE patterns with delimiters, matched against `Request::getPathInfo()`. The tenant id is the `tenant` named group, else the first capture group, e.g. `'#^/projects/(?<tenant>[0-9a-f-]{36})(?:/\|$)#i'`. Validated at container build: an invalid pattern or one without a capture group throws `InvalidConfigurationException` |
+| `access_checker` | `null` | Service id implementing `Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface`. `null` uses the service named after the interface (the autowiring alias Symfony creates when the host has exactly one implementation) |
+| `priority` | `16` | `kernel.exception` priority; minimum `2` so it always runs before the firewall `ExceptionListener` (1) |
+
+On an `AccessDeniedException` (voter / `denyAccessUnlessGranted()` / `#[IsGranted]`) or `AccessDeniedHttpException` (access guard) whose path matches, for a signed-in user (`UserInterface` token) for whom `hasAnyAccess($user, $tenantId)` is `false`, the throwable becomes a plain `NotFoundHttpException` with no message and **no previous exception**. Anonymous visitors, other exceptions and non-matching paths are untouched. Without SecurityBundle (`security.token_storage` missing) every visitor is anonymous and nothing is masked.
+
 ## trusted_hosts
 
 Env var processor `%env(nowo_trusted_hosts:SYMFONY_TRUSTED_HOSTS)%` so production never runs without a Host allowlist:

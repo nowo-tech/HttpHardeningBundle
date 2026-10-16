@@ -19,6 +19,7 @@ Symfony bundle for public HTTP hardening:
 - **CSP nonce lint** — `nowo:http-hardening:lint-csp-nonces [dirs...]` fails on inline Twig blocks without a nonce (CI-friendly)
 - **Public cache** (opt-in) — `private, max-age=120, must-revalidate` + `Vary: Cookie` on anonymous public pages, `public` policy on crawler/PWA files, no ETag on nonce'd HTML; coexists with the session strip
 - **No-store paths** (opt-in) — `Cache-Control: no-store, private` and no `ETag` / `Last-Modified` on paths (PCRE) or routes holding credentials; wins over every other cache policy
+- **Tenant existence mask** (opt-in) — no existence oracle on tenant URLs: an access denial on `/projects/{id}/…`-style paths answers **404** (like an unknown id) for a signed-in user with no access at all to that tenant; members with a too-low role keep 403. The host implements `TenantAccessCheckerInterface`
 - **Canonical host** (opt-in) — single 301 from `www.` to the apex host of your public base URL
 - **Safe URLs** — `SafeInternalRedirect` service (open-redirect guard) and `SafeHref`, with optional `safe_internal_path()` / `safe_href()` Twig functions
 - **Bounded request body** — `BoundedRequestBody::read($request, $maxBytes)` streams the raw body with a hard cap (chunked bodies without `Content-Length` included) and throws a 413 `RequestBodyTooLargeException`
@@ -38,7 +39,7 @@ Compatible with Symfony 7.4, 8.0, and 8.1. PHP 8.2+ (Symfony 8.x requires PHP 8.
 composer require nowo-tech/http-hardening-bundle
 ```
 
-Security headers are on by default. Everything else (session strip, CSP, public cache, no-store paths, canonical host, safe-URL Twig functions) is opt-in — see [Configuration](docs/CONFIGURATION.md) and [Usage](docs/USAGE.md).
+Security headers are on by default. Everything else (session strip, CSP, public cache, no-store paths, tenant existence mask, canonical host, safe-URL Twig functions) is opt-in — see [Configuration](docs/CONFIGURATION.md) and [Usage](docs/USAGE.md).
 
 ## Documentation
 

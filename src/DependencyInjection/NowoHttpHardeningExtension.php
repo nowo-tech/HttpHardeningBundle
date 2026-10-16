@@ -14,8 +14,10 @@ use Nowo\HttpHardeningBundle\EventSubscriber\ContentSecurityPolicySubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\NoStoreSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\SecurityHeadersSubscriber;
+use Nowo\HttpHardeningBundle\EventSubscriber\TenantExistenceMaskSubscriber;
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
 use Nowo\HttpHardeningBundle\Http\TrustedHostsEnvVarProcessor;
+use Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface;
 use Nowo\HttpHardeningBundle\Twig\CspNonceExtension;
 use Nowo\HttpHardeningBundle\Twig\SafeUrlExtension;
 use Symfony\Component\Console\Command\Command;
@@ -25,6 +27,8 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Reference;
 use Twig\Extension\AbstractExtension;
+
+use function is_string;
 
 /**
  * @author Héctor Franco Aceituno <hectorfranco@nowo.tech>
@@ -77,6 +81,7 @@ final class NowoHttpHardeningExtension extends Extension
         $this->loadCsp($config['csp'], $container);
         $this->loadPublicCache($config['public_cache'], $container);
         $this->loadNoStore($config['no_store'], $container);
+        $this->loadTenantExistenceMask($config['tenant_existence_mask'], $container);
         $this->loadCanonicalHost($config['canonical_host'], $container);
         $this->loadTrustedHosts($config['trusted_hosts'], $container);
         $this->loadSafeUrls($config['safe_urls'], $container);
@@ -190,6 +195,32 @@ final class NowoHttpHardeningExtension extends Extension
             'priority' => NoStoreSubscriber::PRIORITY,
         ]);
         $container->setDefinition(NoStoreSubscriber::class, $definition);
+    }
+
+    /**
+     * @param array<string, mixed> $mask
+     */
+    private function loadTenantExistenceMask(array $mask, ContainerBuilder $container): void
+    {
+        if (!$mask['enabled']) {
+            return;
+        }
+
+        $checker = is_string($mask['access_checker']) && '' !== $mask['access_checker']
+            ? $mask['access_checker']
+            : TenantAccessCheckerInterface::class;
+
+        $definition = new Definition(TenantExistenceMaskSubscriber::class);
+        $definition->setArgument('$tokenStorage', new Reference('security.token_storage', ContainerBuilder::NULL_ON_INVALID_REFERENCE));
+        $definition->setArgument('$accessChecker', new Reference($checker));
+        $definition->setArgument('$pathPatterns', array_values(array_map(strval(...), (array) $mask['path_patterns'])));
+        // Before the firewall ExceptionListener (priority 1) turns an AccessDeniedException into a 403.
+        $definition->addTag('kernel.event_listener', [
+            'event' => 'kernel.exception',
+            'method' => 'onException',
+            'priority' => (int) $mask['priority'],
+        ]);
+        $container->setDefinition(TenantExistenceMaskSubscriber::class, $definition);
     }
 
     /**

@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.7.0](#to-170)
 - [To 1.6.0](#to-160)
 - [From 1.4.0 to 1.5.0](#from-140-to-150)
 - [From 1.3.0 to 1.4.0](#from-130-to-140)
@@ -16,6 +17,29 @@
 - [First install](#first-install)
 
 ## Unreleased
+
+## To 1.7.0
+
+No breaking changes; the new `tenant_existence_mask` section is off by default.
+
+```bash
+composer update nowo-tech/http-hardening-bundle
+```
+
+If the host has its own `kernel.exception` listener that turns a 403 on tenant URLs into a 404 for users without access, replace it:
+
+1. Implement `Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface` (`hasAnyAccess(UserInterface $user, string $tenantId): bool`, `true` for any relationship that reveals the tenant). With autowiring and a single implementation, nothing else is needed; otherwise set `access_checker` to its service id.
+2. Move the path regex to config (the tenant id in a `tenant` named group or the first capture group):
+
+   ```yaml
+   nowo_http_hardening:
+       tenant_existence_mask:
+           enabled: true
+           path_patterns:
+               - '#^/projects/(?<tenant>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?:/|$)#'
+   ```
+
+3. Delete the host listener and its unit test; keep the functional test that compares an existing and an unknown tenant (it now covers the bundle wiring).
 
 ## To 1.6.0
 

@@ -6,6 +6,7 @@ namespace Nowo\HttpHardeningBundle\DependencyInjection;
 
 use Nowo\HttpHardeningBundle\EventSubscriber\ContentSecurityPolicySubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
+use Nowo\HttpHardeningBundle\EventSubscriber\TenantExistenceMaskSubscriber;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
@@ -68,6 +69,7 @@ final class Configuration implements ConfigurationInterface
         $this->addCspSection($root);
         $this->addPublicCacheSection($root);
         $this->addNoStoreSection($root);
+        $this->addTenantExistenceMaskSection($root);
         $this->addCanonicalHostSection($root);
         $this->addSafeUrlsSection($root);
         $this->addWebProfilerSection($root);
@@ -200,6 +202,52 @@ final class Configuration implements ConfigurationInterface
                     ->end()
                 ->end()
             ->end();
+    }
+
+    private function addTenantExistenceMaskSection(ArrayNodeDefinition $root): void
+    {
+        $root
+            ->children()
+                ->arrayNode('tenant_existence_mask')
+                    ->info('No existence oracle on tenant URLs: an access denial on a masked path for a signed-in user with no access at all to the captured tenant answers 404 (like an unknown id) instead of 403.')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->booleanNode('enabled')->defaultFalse()->end()
+                        ->arrayNode('path_patterns')
+                            ->info('PCRE patterns (with delimiters) matched against Request::getPathInfo(); the tenant id is the "tenant" named group, else the first capture group, e.g. "#^/projects/(?<tenant>[0-9a-f-]{36})(?:/|$)#i".')
+                            ->scalarPrototype()
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $pattern): bool => !self::isValidPattern($pattern) || !self::hasCaptureGroup((string) $pattern))
+                                    ->thenInvalid('tenant_existence_mask.path_patterns entry %s is not a valid PCRE pattern with a capture group for the tenant id (e.g. "#^/projects/(?<tenant>[^/]+)(?:/|$)#").')
+                                ->end()
+                            ->end()
+                            ->defaultValue([])
+                        ->end()
+                        ->scalarNode('access_checker')
+                            ->info('Service id implementing Nowo\\HttpHardeningBundle\\Security\\TenantAccessCheckerInterface (default: the autowiring alias of that interface).')
+                            ->defaultNull()
+                        ->end()
+                        ->integerNode('priority')
+                            ->info('kernel.exception listener priority; must stay above the firewall ExceptionListener (1).')
+                            ->defaultValue(TenantExistenceMaskSubscriber::DEFAULT_PRIORITY)
+                            ->min(2)
+                        ->end()
+                    ->end()
+                    ->validate()
+                        ->ifTrue(static fn (array $mask): bool => true === $mask['enabled'] && [] === $mask['path_patterns'])
+                        ->thenInvalid('tenant_existence_mask.enabled requires at least one path_patterns entry.')
+                    ->end()
+                ->end()
+            ->end();
+    }
+
+    /**
+     * Whether a pattern has a capturing group (plain, `(?<name>…)`, `(?P<name>…)` or `(?'name'…)`); escaped
+     * parentheses do not count. Config processing only.
+     */
+    public static function hasCaptureGroup(string $pattern): bool
+    {
+        return 1 === preg_match("/(?<!\\\\)\\((?:(?!\\?)|\\?P?<(?![=!])|\\?')/", $pattern);
     }
 
     /**

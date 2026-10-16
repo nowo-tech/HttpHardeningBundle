@@ -1,6 +1,6 @@
 # Release
 
-Current stable: **v1.5.0**.
+Current stable: **v1.7.0**.
 
 1. Update [CHANGELOG.md](CHANGELOG.md) and [UPGRADING.md](UPGRADING.md).
 2. Confirm [SECURITY.md](SECURITY.md) checklist 12.4.1 and REQ-SEC-004 grade.

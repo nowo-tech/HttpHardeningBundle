@@ -34,6 +34,7 @@ Mechanical proof is **PHPUnit** + **PHPStan** + **Igor**. There is no separate e
 | US-02 | HSTS is not pinned on loopback HTTPS by default | `hsts_skip_loopback` · [CONFIGURATION](CONFIGURATION.md) |
 | US-03 | Anonymous public GET strips the session cookie for CDN/checkers | `AnonymousSessionCookieStripSubscriber` · [USAGE](USAGE.md) |
 | US-04 | Authenticated users keep the session cookie | `UserInterface` check · [SECURITY](SECURITY.md) |
+| US-05 | A signed-in stranger cannot tell an existing tenant from an unknown one (no 403/404 existence oracle) | `TenantExistenceMaskSubscriber`, `TenantAccessCheckerInterface` · [USAGE](USAGE.md) · spec [`006`](../specs/006-tenant-existence-mask/spec.md) |
 
 ## Bundle functional scope
 
@@ -52,6 +53,7 @@ Mechanical proof is **PHPUnit** + **PHPStan** + **Igor**. There is no separate e
 | `NowoHttpHardeningBundle` | Bundle entry + DI extension alias |
 | `SecurityHeadersSubscriber` | Apply baseline response headers when missing |
 | `AnonymousSessionCookieStripSubscriber` | Strip session cookie on configured anonymous public GET/HEAD |
+| `TenantExistenceMaskSubscriber` / `TenantAccessCheckerInterface` | Opt-in 403 → 404 on tenant paths for users with no access (host SPI decides) |
 | Config alias `nowo_http_hardening` | `security_headers.*`, `anonymous_session_strip.*` |
 
 ## Validating the functional spec

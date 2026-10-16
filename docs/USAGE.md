@@ -119,6 +119,55 @@ nowo_http_hardening:
 
 Full `kernel.response` order: security headers (-80) → CSP (-100) → session listener (-1000) → strip (-1024) → public cache (-1100) → no-store (-1200). A route listed both in `public_cache` and `no_store` ends up `no-store`.
 
+## Tenant existence mask
+
+Multi-tenant apps (projects, organisations, workspaces…) expose ids in URLs. If a stranger gets **403** on `/projects/<existing-id>/settings` but **404** on `/projects/<random-id>/settings`, the status code is an **existence oracle**: anyone signed in can enumerate which ids exist (and, with guessable ids, how many tenants you have or whether a known customer uses the product). The fix is to give a user with **no** access at all the same answer as an unknown id.
+
+```yaml
+nowo_http_hardening:
+    tenant_existence_mask:
+        enabled: true
+        path_patterns:
+            - '#^/projects/(?<tenant>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?:/|$)#'
+        # access_checker: App\Security\ProjectExistenceChecker   # optional, default: the interface alias
+```
+
+Implement the SPI (autowiring aliases the interface to your class when it is the only implementation):
+
+```php
+use Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
+
+final readonly class ProjectExistenceChecker implements TenantAccessCheckerInterface
+{
+    public function __construct(private ProjectRepository $projects, private ProjectAccess $access) {}
+
+    public function hasAnyAccess(UserInterface $user, string $tenantId): bool
+    {
+        $project = $this->projects->findOneBy(['uuid' => strtolower($tenantId)]);
+
+        // Unknown id → false (404 anyway); any membership, share grant or admin override → true (keep 403).
+        return null !== $project && $user instanceof User && $this->access->hasAny($project, $user);
+    }
+}
+```
+
+| Who | Before | After |
+| --- | --- | --- |
+| Signed-in stranger, existing tenant | 403 | **404** |
+| Signed-in stranger, unknown tenant | 404 | 404 |
+| Member whose role is too low for this page | 403 | 403 (they already know the tenant) |
+| Anonymous visitor | login redirect / 401 | unchanged |
+
+Notes:
+
+- **"Any access"**, not "enough access": return `true` for the weakest relationship that already reveals the tenant (viewer, share link, admin override). Returning the page's required role would turn every legitimate 403 into a confusing 404.
+- **No `previous` on the 404.** The firewall `ExceptionListener` walks the exception chain; a nested `AccessDeniedException` would be turned back into a 403. Keep that in mind if you write a similar listener.
+- **The tenant id is passed raw** (as captured). Normalise case yourself; return `false` for malformed ids.
+- **Keep the 404 identical**: the mask throws a bare `NotFoundHttpException`, which renders exactly like the one your controller throws for an unknown id (same error template, no message).
+- **Pair it with entity-level 404s** for owner-scoped lookups *inside* a tenant (issue, comment, file): resolve them with a query scoped to the tenant (`findOneBy(['tenant' => $tenant, 'id' => $id])`) and throw 404 when missing, so a member of tenant A cannot probe ids of tenant B through A's URLs. The mask only covers the tenant segment of the path.
+- APIs and webhooks with their own error format are not masked unless their paths match a pattern; keep their answers consistent the same way.
+
 ## Canonical host
 
 ```yaml

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.7.0] - 2026-10-16](#170---2026-10-16)
 - [[1.6.0] - 2026-10-15](#160---2026-10-15)
 - [[1.5.0] - 2026-10-14](#150---2026-10-14)
 - [[1.4.0] - 2026-10-13](#140---2026-10-13)
@@ -21,6 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-10-07](#100---2026-10-07)
 
 ## [Unreleased]
+
+## [1.7.0] - 2026-10-16
+
+### Added
+
+- **Tenant existence mask (`tenant_existence_mask`, opt-in).** No existence oracle on tenant URLs: on `kernel.exception` (priority 16, before the firewall `ExceptionListener`), an `AccessDeniedException` or `AccessDeniedHttpException` on a path matching `tenant_existence_mask.path_patterns` (PCRE; tenant id = `tenant` named group, else group 1) becomes a plain `NotFoundHttpException` — the same answer as an unknown id — when the signed-in user has no access at all to that tenant. Members with a too-low role keep 403; anonymous visitors keep the login redirect / 401. The 404 has no `previous` (the firewall walks the chain and would re-raise the 403). The host implements the new SPI `Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface::hasAnyAccess(UserInterface $user, string $tenantId): bool` (`access_checker`, default: the interface alias). Patterns without a capture group, and `enabled: true` without patterns, fail the container build (spec `006`).
+
+### Changed
+
+- `igor.json` excludes `tests`, `demo`, `vendor`, `var` and `coverage` like the other Nowo bundles (test doubles are not worker services); `rector.php` skips `RemoveParentDelegatingConstructorRector` on `JsonUploadException`, whose constructor promotes the public `reason` property.
+
+### Dependencies
+
+- Dev only: `symfony/framework-bundle`, `symfony/security-bundle`, `symfony/browser-kit` (functional kernel tests). No runtime changes.
 
 ## [1.6.0] - 2026-10-15
 
