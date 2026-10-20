@@ -11,7 +11,15 @@
 
 > ⭐ **Found this useful?** Install it from [Packagist](https://packagist.org/packages/nowo-tech/http-hardening-bundle) and star [HttpHardeningBundle](https://github.com/nowo-tech/HttpHardeningBundle).
 
-Symfony bundle for public HTTP hardening:
+Symfony bundle for public HTTP hardening: security headers, anonymous session strip, opt-in CSP with per-request nonces, cache policies, tenant existence masking, canonical host and safe-URL helpers.
+
+> Compatible with Symfony 7.4, 8.0, and 8.1. PHP 8.2+ (Symfony 8.x requires PHP 8.4+).
+
+![FrankenPHP Friendly Worker Mode](docs/images/frankenphp-friendly.png)
+
+This bundle is **FrankenPHP worker mode friendly**.
+
+## Features
 
 - **Security headers** — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Resource-Policy`, optional HSTS
 - **Anonymous session strip** — remove the session cookie on configured public GET/HEAD routes so CDNs and checkers see cacheable HTML
@@ -25,14 +33,6 @@ Symfony bundle for public HTTP hardening:
 - **Bounded request body** — `BoundedRequestBody::read($request, $maxBytes)` streams the raw body with a hard cap (chunked bodies without `Content-Length` included) and throws a 413 `RequestBodyTooLargeException`
 - **Worker-safe Web Profiler CSP** — in dev, WebProfilerBundle's CSP handler is made non-shared so a `/_wdt` or `/_profiler` request cannot strip the CSP header from later pages in FrankenPHP worker mode (`web_profiler.isolate_csp_handler`, on by default, no-op in prod)
 
-Compatible with Symfony 7.4, 8.0, and 8.1. PHP 8.2+ (Symfony 8.x requires PHP 8.4+).
-
-## Requirements
-
-- PHP ≥ 8.2
-- Symfony 7.4 or 8.x (`http-kernel`, `security-core`)
-- Optional: `twig/twig` (Twig helpers), `symfony/console` (lint command)
-
 ## Quick start
 
 ```bash
@@ -40,6 +40,12 @@ composer require nowo-tech/http-hardening-bundle
 ```
 
 Security headers are on by default. Everything else (session strip, CSP, public cache, no-store paths, tenant existence mask, canonical host, safe-URL Twig functions) is opt-in — see [Configuration](docs/CONFIGURATION.md) and [Usage](docs/USAGE.md).
+
+## Requirements
+
+- PHP ≥ 8.2
+- Symfony 7.4 or 8.x (`http-kernel`, `security-core`)
+- Optional: `twig/twig` (Twig helpers), `symfony/console` (lint command)
 
 ## Documentation
 
@@ -58,6 +64,7 @@ Security headers are on by default. Everything else (session strip, CSP, public 
 
 ### Additional documentation
 
+- [GitHub Actions CI requirements](docs/GITHUB_CI.md)
 - [PSR evaluation](docs/PSR.md)
 
 ## Tests and coverage

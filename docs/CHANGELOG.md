@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation: wave-1 REQ compliance — README preamble (blurb, compatibility note, FrankenPHP Friendly banner + claim) and Features section, Quick start before Requirements, documentation list with GitHub CI doc, new `docs/GITHUB_CI.md`, canonical issue templates, CONTRIBUTING Code of Conduct / Cursor Agent / post-commit check, RELEASE post-commit check, TOCs, canonical baseline inventory 25/25 (FR-TH-001, FR-UPL-001/002 added).
+
 ## [1.7.0] - 2026-10-16
 
 ### Added

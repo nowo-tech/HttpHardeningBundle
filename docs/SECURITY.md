@@ -1,5 +1,20 @@
 # Security
 
+## Table of contents
+
+- [Scope](#scope)
+- [Attack surface](#attack-surface)
+- [Threat model](#threat-model)
+- [Mitigations](#mitigations)
+- [What the host must still do](#what-the-host-must-still-do)
+- [Secrets and cryptography](#secrets-and-cryptography)
+- [Logging](#logging)
+- [Dependencies and updates](#dependencies-and-updates)
+- [Permissions and exposure](#permissions-and-exposure)
+- [Reporting](#reporting)
+- [Release security checklist (12.4.1)](#release-security-checklist-1241)
+- [AI security audit](#ai-security-audit)
+
 ## Scope
 
 This bundle hardens HTTP **responses**:

@@ -87,6 +87,19 @@ Config root: `nowo_http_hardening`.
 | FR-STRIP-005 | Remove only the configured session cookie name; re-emit other cookies |
 | FR-STRIP-006 | When a session cookie was stripped and `public` Cache-Control is absent, set configured `cache_control` |
 
+### Trusted hosts env var processor (`FR-TH-*`)
+
+| ID | Requirement |
+| ---- | ----------- |
+| FR-TH-001 | `TrustedHostsEnvVarProcessor` (`%env(nowo_trusted_hosts:VAR)%`) returns the named variable, then `trusted_hosts.fallback_env`, then — outside `local_environments` — a regex derived from the host of `public_url_env` plus `internal_hosts`, so production never runs with an empty `framework.trusted_hosts` |
+
+### Bounded JSON upload (`FR-UPL-*`)
+
+| ID | Requirement |
+| ---- | ----------- |
+| FR-UPL-001 | `JsonUpload::decodeObject(?UploadedFile, int $maxBytes)` checks the declared size, reads at most cap + 1 bytes and only accepts a JSON object |
+| FR-UPL-002 | Failures throw `JsonUploadException` with a `reason` constant (`missing_file`, `too_large`, `invalid_json`) |
+
 ### Security docs
 
 | ID | Requirement |
@@ -98,7 +111,7 @@ Config root: `nowo_http_hardening`.
 
 | ID | Criterion |
 | ---- | --------- |
-| SC-01 | `find src -type f` count equals mapped rows in `code-inventory.md` (**5/5**) |
+| SC-01 | `git ls-files src \| wc -l` equals the mapped count in `code-inventory.md` (**25/25**, all shipped features 001–006) |
 | SC-02 | PHPUnit covers `src/` at ≥99% statements (target 100%) |
 | SC-03 | `make release-check` passes on the release commit |
 | SC-04 | CI `ci.yml` green on default branch |

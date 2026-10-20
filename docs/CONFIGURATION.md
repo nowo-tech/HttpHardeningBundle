@@ -2,6 +2,19 @@
 
 Root key: `nowo_http_hardening`.
 
+## Table of contents
+
+- [security_headers](#security_headers)
+- [anonymous_session_strip](#anonymous_session_strip)
+- [csp](#csp)
+- [public_cache](#public_cache)
+- [no_store](#no_store)
+- [tenant_existence_mask](#tenant_existence_mask)
+- [trusted_hosts](#trusted_hosts)
+- [canonical_host](#canonical_host)
+- [safe_urls](#safe_urls)
+- [web_profiler](#web_profiler)
+
 ## security_headers
 
 | Key | Default | Notes |

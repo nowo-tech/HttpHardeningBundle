@@ -2,6 +2,23 @@
 
 After installation, security headers apply on every main response when `security_headers.enabled` is true (default).
 
+## Table of contents
+
+- [Security headers](#security-headers)
+- [Anonymous session strip](#anonymous-session-strip)
+- [Content-Security-Policy](#content-security-policy)
+  - [Strict-nonce layouts](#strict-nonce-layouts)
+  - [Lint templates in CI](#lint-templates-in-ci)
+  - [Runtime sources](#runtime-sources)
+- [Public cache](#public-cache)
+- [No-store paths](#no-store-paths)
+- [Tenant existence mask](#tenant-existence-mask)
+- [Canonical host](#canonical-host)
+- [Bounded request body](#bounded-request-body)
+- [Web Profiler in worker mode](#web-profiler-in-worker-mode)
+- [Safe internal redirects](#safe-internal-redirects)
+- [Bounded JSON uploads](#bounded-json-uploads)
+
 ## Security headers
 
 No code calls are required. Tune values under `nowo_http_hardening.security_headers` in [CONFIGURATION.md](CONFIGURATION.md). Existing response headers are never overwritten.
