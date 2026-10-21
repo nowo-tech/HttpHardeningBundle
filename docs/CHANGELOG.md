@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI: new `phpstan` job runs `composer phpstan` on every push and pull request, so PHPStan findings fail the build (REQ-CS-006).
+- `release-check` runs sequentially and starts with `ensure-up` (REQ-MAKE-002).
+
+### Fixed
+
+- `.scripts/check-no-cursor-coauthor.sh` also runs inside git worktrees (`.git` file instead of directory).
+
 ## [1.7.1] - 2026-10-20
 
 Documentation: wave-1 REQ compliance (README, CONTRIBUTING, issue templates, Spec Kit inventory). See [UPGRADING](UPGRADING.md#to-171).

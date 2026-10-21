@@ -118,7 +118,18 @@ validate: ensure-up
 # Run Igor worker-state audit (REQ-CS-008)
 igor: ensure-up
 	$(COMPOSE) exec -T php composer igor
-release-check: check-no-cursor-coauthor check-open-prs ensure-up composer-sync cs-fix cs-check rector-dry phpstan igor test-coverage
+# REQ-MAKE-002: sequential chain, ensure-up first (no Twig templates or demos: Twig/raw-form/demo steps N/A).
+release-check:
+	@$(MAKE) ensure-up
+	@$(MAKE) check-no-cursor-coauthor
+	@$(MAKE) check-open-prs
+	@$(MAKE) composer-sync
+	@$(MAKE) cs-fix
+	@$(MAKE) cs-check
+	@$(MAKE) rector-dry
+	@$(MAKE) phpstan
+	@$(MAKE) igor
+	@$(MAKE) test-coverage
 
 composer-sync: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer validate --strict
