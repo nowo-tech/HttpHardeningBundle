@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php)](https://php.net)
 [![Symfony](https://img.shields.io/badge/Symfony-7.4%20%7C%208.0%20%7C%208.1%2B-000000?logo=symfony)](https://symfony.com)
-[![GitHub stars](https://img.shields.io/github/stars/nowo-tech/http-hardening-bundle.svg?style=social&label=Star)](https://github.com/nowo-tech/HttpHardeningBundle)
+[![GitHub stars](https://img.shields.io/github/stars/nowo-tech/HttpHardeningBundle.svg?style=social&label=Star)](https://github.com/nowo-tech/HttpHardeningBundle)
 [![Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen)](#tests-and-coverage)
 
 > ⭐ **Found this useful?** Install it from [Packagist](https://packagist.org/packages/nowo-tech/http-hardening-bundle) and star [HttpHardeningBundle](https://github.com/nowo-tech/HttpHardeningBundle).
