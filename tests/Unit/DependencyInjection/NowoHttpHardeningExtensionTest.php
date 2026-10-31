@@ -14,9 +14,11 @@ use Nowo\HttpHardeningBundle\EventSubscriber\CanonicalHostRedirectSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\ContentSecurityPolicySubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\NoStoreSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
+use Nowo\HttpHardeningBundle\EventSubscriber\RateLimitSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\SecurityHeadersSubscriber;
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
 use Nowo\HttpHardeningBundle\Http\TrustedHostsEnvVarProcessor;
+use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiter;
 use Nowo\HttpHardeningBundle\Twig\CspNonceExtension;
 use Nowo\HttpHardeningBundle\Twig\SafeUrlExtension;
 use PHPUnit\Framework\TestCase;
@@ -24,6 +26,7 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\EventDispatcher\DependencyInjection\RegisterListenersPass;
 use Symfony\Component\EventDispatcher\EventDispatcher;
@@ -194,6 +197,43 @@ final class NowoHttpHardeningExtensionTest extends TestCase
         self::assertSame(['#^/admin(?:/|$)#'], $definition->getArgument('$pathPatterns'));
         self::assertSame(['app_keys'], $definition->getArgument('$routes'));
         self::assertSame([['event' => 'kernel.response', 'method' => '__invoke', 'priority' => -1200]], $definition->getTag('kernel.event_listener'));
+    }
+
+    public function testRateLimitIsOffByDefaultButTheLimiterIsAvailable(): void
+    {
+        $container = new ContainerBuilder();
+        (new NowoHttpHardeningExtension())->load([], $container);
+
+        self::assertFalse($container->hasDefinition(RateLimitSubscriber::class));
+        $limiter = $container->getDefinition(PerMinuteRateLimiter::class);
+        self::assertFalse($limiter->isPublic());
+        self::assertEquals(new Reference('cache.app'), $limiter->getArgument('$cache'));
+    }
+
+    public function testLoadRegistersRateLimitWhenEnabled(): void
+    {
+        $container = new ContainerBuilder();
+        (new NowoHttpHardeningExtension())->load([[
+            'rate_limit' => [
+                'enabled' => true,
+                'cache_pool' => 'cache.rate_limiter',
+                'priority' => 64,
+                'rules' => [
+                    'hooks' => ['path_prefixes' => ['/hooks/slack', '/hooks/email'], 'limit_per_minute' => 120],
+                    'ingest' => ['path_patterns' => ['#^/api/[^/]+/ingest#'], 'methods' => ['post'], 'limit_provider' => 'app.ingest_limit'],
+                ],
+            ],
+        ]], $container);
+
+        self::assertEquals(new Reference('cache.rate_limiter'), $container->getDefinition(PerMinuteRateLimiter::class)->getArgument('$cache'));
+        $definition = $container->getDefinition(RateLimitSubscriber::class);
+        self::assertEquals(new Reference(PerMinuteRateLimiter::class), $definition->getArgument('$limiter'));
+        self::assertSame([
+            'hooks' => ['path_prefixes' => ['/hooks/slack', '/hooks/email'], 'path_patterns' => [], 'methods' => [], 'limit_per_minute' => 120],
+            'ingest' => ['path_prefixes' => [], 'path_patterns' => ['#^/api/[^/]+/ingest#'], 'methods' => ['POST'], 'limit_per_minute' => 60],
+        ], $definition->getArgument('$rules'));
+        self::assertEquals(['ingest' => new Reference('app.ingest_limit')], $definition->getArgument('$limitProviders'));
+        self::assertSame([['event' => 'kernel.request', 'method' => '__invoke', 'priority' => 64]], $definition->getTag('kernel.event_listener'));
     }
 
     public function testInvalidNoStorePatternFailsContainerBuild(): void

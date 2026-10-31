@@ -56,6 +56,7 @@
         "symfony/console": "^7.4 || ^8.0",
         "symfony/framework-bundle": "^7.4 || ^8.0",
         "symfony/phpunit-bridge": "^7.4 || ^8.0",
+        "symfony/rate-limiter": "^7.4 || ^8.0",
         "symfony/security-bundle": "^7.4 || ^8.0",
         "symfony/yaml": "^7.4 || ^8.0",
         "twig/twig": "^3.12"
@@ -107,6 +108,7 @@
         "symfony/flex": "For automatic recipe installation",
         "symfony/security-bundle": "Lets anonymous_session_strip / public_cache recognise signed-in users (without it every visitor is anonymous)",
         "symfony/console": "For the nowo:http-hardening:lint-csp-nonces command",
+        "symfony/rate-limiter": "For the PerMinuteRateLimiter service and the opt-in rate_limit 429 subscriber",
         "twig/twig": "For the csp_nonce() / |csp_stamp and safe_internal_path() / safe_href() Twig helpers"
     }
 }

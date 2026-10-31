@@ -6,13 +6,21 @@ namespace Nowo\HttpHardeningBundle\DependencyInjection;
 
 use Nowo\HttpHardeningBundle\EventSubscriber\ContentSecurityPolicySubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
+use Nowo\HttpHardeningBundle\EventSubscriber\RateLimitSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\TenantExistenceMaskSubscriber;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
+use function array_filter;
+use function array_keys;
+use function array_map;
+use function is_array;
 use function is_string;
+use function preg_match;
 use function sprintf;
+use function str_starts_with;
+use function strtoupper;
 
 /**
  * @author Héctor Franco Aceituno <hectorfranco@nowo.tech>
@@ -73,6 +81,7 @@ final class Configuration implements ConfigurationInterface
         $this->addCanonicalHostSection($root);
         $this->addSafeUrlsSection($root);
         $this->addWebProfilerSection($root);
+        $this->addRateLimitSection($root);
 
         return $treeBuilder;
     }
@@ -332,6 +341,88 @@ final class Configuration implements ConfigurationInterface
                             ->info('Make WebProfilerBundle\'s web_profiler.csp.handler non-shared so a /_wdt or /_profiler request cannot strip the CSP header from later pages in a long-running worker (FrankenPHP worker mode). No-op without WebProfilerBundle.')
                             ->defaultTrue()
                         ->end()
+                    ->end()
+                ->end()
+            ->end();
+    }
+
+    private function addRateLimitSection(ArrayNodeDefinition $root): void
+    {
+        $root
+            ->children()
+                ->arrayNode('rate_limit')
+                    ->info('Per-client-IP "N per minute" sliding-window limit on configured paths (429 + Retry-After). Needs symfony/rate-limiter. The PerMinuteRateLimiter service is available whenever symfony/rate-limiter is installed.')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->booleanNode('enabled')->defaultFalse()->end()
+                        ->scalarNode('cache_pool')
+                            ->info('PSR-6 cache pool service id holding the buckets (shared by every worker / replica when it is Redis-backed).')
+                            ->defaultValue('cache.app')
+                            ->cannotBeEmpty()
+                        ->end()
+                        ->integerNode('priority')
+                            ->info('kernel.request listener priority; keep it above the firewall (8) so throttled requests never reach credential lookups.')
+                            ->defaultValue(RateLimitSubscriber::DEFAULT_PRIORITY)
+                        ->end()
+                        ->arrayNode('rules')
+                            ->info('Named rules; the first one whose method and path match a main request applies. The name separates the buckets of each rule.')
+                            ->useAttributeAsKey('name')
+                            ->arrayPrototype()
+                                ->children()
+                                    ->arrayNode('path_prefixes')
+                                        ->info('Path prefixes matched against Request::getPathInfo(), segment-aware ("/hooks/slack" matches "/hooks/slack" and "/hooks/slack/x", not "/hooks/slackware"; a trailing "/" makes it a plain prefix).')
+                                        ->scalarPrototype()
+                                            ->validate()
+                                                ->ifTrue(static fn (mixed $prefix): bool => !is_string($prefix) || !str_starts_with($prefix, '/'))
+                                                ->thenInvalid('rate_limit.rules.*.path_prefixes entry %s must start with "/".')
+                                            ->end()
+                                        ->end()
+                                        ->defaultValue([])
+                                    ->end()
+                                    ->arrayNode('path_patterns')
+                                        ->info('PCRE patterns (with delimiters) matched against Request::getPathInfo(), e.g. "#^/api/[^/]+/ingest(?:/|$)#".')
+                                        ->scalarPrototype()
+                                            ->validate()
+                                                ->ifTrue(static fn (mixed $pattern): bool => !self::isValidPattern($pattern))
+                                                ->thenInvalid('rate_limit.rules.*.path_patterns entry %s is not a valid PCRE pattern (delimiters included).')
+                                            ->end()
+                                        ->end()
+                                        ->defaultValue([])
+                                    ->end()
+                                    ->arrayNode('methods')
+                                        ->info('HTTP methods the rule applies to (empty: every method).')
+                                        ->beforeNormalization()
+                                            ->ifArray()
+                                            ->then(static fn (array $methods): array => array_map(static fn (mixed $m): mixed => is_string($m) ? strtoupper($m) : $m, $methods))
+                                        ->end()
+                                        ->scalarPrototype()->end()
+                                        ->defaultValue([])
+                                    ->end()
+                                    ->integerNode('limit_per_minute')
+                                        ->info('Requests allowed per client IP and sliding minute; 0 disables the rule.')
+                                        ->defaultValue(60)
+                                        ->min(0)
+                                    ->end()
+                                    ->scalarNode('limit_provider')
+                                        ->info('Service id implementing Nowo\\HttpHardeningBundle\\RateLimit\\RateLimitProviderInterface; its runtime value replaces limit_per_minute.')
+                                        ->defaultNull()
+                                    ->end()
+                                ->end()
+                                ->validate()
+                                    ->ifTrue(static fn (array $rule): bool => [] === $rule['path_prefixes'] && [] === $rule['path_patterns'])
+                                    ->thenInvalid('Each rate_limit.rules entry needs at least one path_prefixes or path_patterns entry.')
+                                ->end()
+                            ->end()
+                            ->validate()
+                                ->ifTrue(static fn (mixed $rules): bool => is_array($rules) && [] !== array_filter(array_keys($rules), static fn (int|string $name): bool => 1 !== preg_match('/^[A-Za-z0-9_.-]+$/', (string) $name)))
+                                ->thenInvalid('rate_limit.rules names may only contain letters, digits, "_", "." and "-": %s.')
+                            ->end()
+                            ->defaultValue([])
+                        ->end()
+                    ->end()
+                    ->validate()
+                        ->ifTrue(static fn (array $rateLimit): bool => true === $rateLimit['enabled'] && [] === $rateLimit['rules'])
+                        ->thenInvalid('rate_limit.enabled requires at least one rules entry.')
                     ->end()
                 ->end()
             ->end();

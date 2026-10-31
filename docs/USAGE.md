@@ -18,6 +18,10 @@ After installation, security headers apply on every main response when `security
 - [Web Profiler in worker mode](#web-profiler-in-worker-mode)
 - [Safe internal redirects](#safe-internal-redirects)
 - [Bounded JSON uploads](#bounded-json-uploads)
+- [Per-minute rate limit](#per-minute-rate-limit)
+  - [Path rules (429)](#path-rules-429)
+  - [Runtime limits](#runtime-limits)
+  - [Limiter service](#limiter-service)
 
 ## Security headers
 
@@ -250,3 +254,67 @@ try {
 
 The declared upload size is checked first and the file is read at most to the cap + 1 byte, so a large upload never fills worker memory; only a JSON **object** is accepted.
 
+## Per-minute rate limit
+
+Needs `symfony/rate-limiter` (`composer require symfony/rate-limiter`). `framework.rate_limiter` pools take a fixed limit from YAML; this limiter reads the limit at each call, so it can come from a setting stored in the database.
+
+### Path rules (429)
+
+```yaml
+# config/packages/nowo_http_hardening.yaml
+nowo_http_hardening:
+    rate_limit:
+        enabled: true
+        rules:
+            webhooks:
+                path_prefixes: ['/hooks/slack', '/hooks/teams/actions', '/hooks/email']
+                limit_per_minute: 120
+```
+
+A client IP sending more than 120 requests per sliding minute to those paths gets `429 Too Many Requests` with `Retry-After` before the firewall and the controller run. See [Configuration — rate_limit](CONFIGURATION.md#rate_limit).
+
+### Runtime limits
+
+```php
+use Nowo\HttpHardeningBundle\RateLimit\RateLimitProviderInterface;
+use Symfony\Component\HttpFoundation\Request;
+
+final readonly class IngestLimitFromSettings implements RateLimitProviderInterface
+{
+    public function __construct(private InstanceSettings $settings) {}
+
+    public function limitPerMinute(string $rule, Request $request): int
+    {
+        return $this->settings->ingestIpRateLimit(); // 0 lets every request through
+    }
+}
+```
+
+```yaml
+nowo_http_hardening:
+    rate_limit:
+        enabled: true
+        rules:
+            ingest:
+                path_patterns: ['#^/api/[^/]+/(?:envelope|otlp)(?:/|$)#']
+                limit_provider: App\RateLimit\IngestLimitFromSettings
+```
+
+The provider runs on every matching request: keep it cheap (cached settings) and stateless.
+
+### Limiter service
+
+For guards that are not a path rule (per project, per API token), inject `PerMinuteRateLimiter` (autowirable, `cache.app` or `rate_limit.cache_pool`):
+
+```php
+use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiter;
+
+if (!$this->limiter->accept('api_token', 'token_'.$tokenId, $project->getRateLimitPerMinute())) {
+    throw new TooManyRequestsHttpException(60);
+}
+
+$state = $this->limiter->consume('webhook_ip', PerMinuteRateLimiter::ipKey($request->getClientIp() ?? ''), 30);
+// null when the limit is 0 (disabled); otherwise a RateLimit with getRemainingTokens() / getRetryAfter()
+```
+
+`$id` separates the buckets of each guard, `$key` is the bucket inside it; `ipKey()` hashes the client IP (`ip_<xxh128>`, `unknown` when empty) so raw addresses never reach the cache keys. A limit of `0` or less disables the check. Without a lock two concurrent requests may both pass on the last token: fine for abuse throttling, not for billing quotas.

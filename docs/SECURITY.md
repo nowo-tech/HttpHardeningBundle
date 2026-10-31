@@ -46,6 +46,8 @@ It does **not** implement a full Content-Security-Policy, WAF, TLS termination, 
 | Tenant enumeration through 403 vs 404 on `/tenants/{id}/…` URLs (existence oracle) | Medium on multi-tenant apps — mitigated by `tenant_existence_mask` for the tenant segment; owner-scoped lookups inside a tenant must 404 at entity level (host) |
 | Mask hiding a legitimate 403 from a member | Low — only users for whom the host checker returns "no access at all" are masked; members keep 403 |
 | Stripping cookies for authenticated users | Low — `UserInterface` tokens keep the session cookie |
+| Pre-auth request floods on public hooks / token APIs (credential lookups, brute force) | Medium on public endpoints — mitigated by the opt-in `rate_limit` rules (429 before the firewall, per hashed client IP); host must configure `framework.trusted_proxies` so `getClientIp()` is the real client |
+| Rate limit bypass or shared bucket behind a proxy | Medium if trusted proxies are missing (every client shares the proxy IP) or spoofable (`X-Forwarded-For` trusted from anywhere) — host configuration |
 | Header injection via config | Low — config is operator-trusted, not end-user input |
 | XSS, CSRF, SSRF, SQL injection, path traversal, deserialization, RCE | Not applicable — no HTML render, no outbound HTTP, no file/CLI surface |
 
@@ -99,6 +101,7 @@ Confirm before each tag:
 | `.env` is gitignored; no secrets in the tree | Required |
 | Flex recipe defaults are safe (`security_headers` on; `anonymous_session_strip` off) | Required |
 | `no_store` stays off by default; invalid path patterns fail the container build | Required |
+| `rate_limit` stays off by default; invalid patterns, relative prefixes and rules without paths fail the container build | Required |
 | `tenant_existence_mask` stays off by default; patterns without a capture group fail the container build; the 404 carries no `previous` | Required |
 | `web_profiler.isolate_csp_handler` only touches `web_profiler.csp.handler` when it exists (dev/test) | Required |
 | Config is operator-trusted; no HTML output to escape | Required |
@@ -106,7 +109,7 @@ Confirm before each tag:
 | No secret logging | Required |
 | No custom cryptography | N/A |
 | No public endpoints / admin UI | N/A |
-| DoS / resource limits | `BoundedRequestBody` caps raw body reads (cap + 1 bytes max); no outbound I/O or subprocesses |
+| DoS / resource limits | `BoundedRequestBody` caps raw body reads (cap + 1 bytes max); opt-in `rate_limit` (429 + `Retry-After`, buckets in a PSR-6 pool keyed by the `xxh128` hash of the client IP, never the raw IP); no outbound I/O or subprocesses |
 | AI security audit (REQ-SEC-004) | Pass (good), 2026-10-07 (reconfirmed for **v1.0.1**; `no_store` reviewed for **v1.4.0**, 2026-10-13; `BoundedRequestBody` and the profiler CSP pass reviewed for **v1.5.0**, 2026-10-14; `tenant_existence_mask` reviewed for **v1.7.0**, 2026-10-16). Overall risk Low. No open Critical or High findings. |
 
 ## AI security audit
