@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.8.0] - 2026-10-31](#180---2026-10-31)
 - [[1.7.2] - 2026-10-21](#172---2026-10-21)
 - [[1.7.1] - 2026-10-20](#171---2026-10-20)
 - [[1.7.0] - 2026-10-16](#170---2026-10-16)
@@ -24,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-10-07](#100---2026-10-07)
 
 ## [Unreleased]
+
+## [1.8.0] - 2026-10-31
+
+PerMinuteRateLimiter (runtime N-per-minute limit, hashed client IP) and opt-in rate_limit rules answering 429 with Retry-After. See [UPGRADING](UPGRADING.md#to-180).
 
 ### Added
 
@@ -177,7 +182,7 @@ Documentation: wave-1 REQ compliance (README, CONTRIBUTING, issue templates, Spe
 - `AnonymousSessionCookieStripSubscriber`: strip the session cookie on configured public GET/HEAD routes for anonymous users and set public Cache-Control.
 - Flex recipe `nowo_http_hardening.yaml` with strip disabled by default.
 
-[Unreleased]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.7.2...HEAD
+[Unreleased]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.8.0...HEAD
 [1.6.0]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.5.0...v1.6.0
 [1.1.0]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.4...v1.1.0
 [1.0.4]: https://github.com/nowo-tech/HttpHardeningBundle/compare/v1.0.3...v1.0.4
