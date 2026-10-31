@@ -14,6 +14,7 @@ Root key: `nowo_http_hardening`.
 - [canonical_host](#canonical_host)
 - [safe_urls](#safe_urls)
 - [web_profiler](#web_profiler)
+- [rate_limit](#rate_limit)
 
 ## security_headers
 
@@ -170,3 +171,35 @@ The `Nowo\HttpHardeningBundle\Http\SafeInternalRedirect` service is always regis
 | `isolate_csp_handler` | `true` | Make `web_profiler.csp.handler` non-shared (compiler pass `WebProfilerCspHandlerPass`) |
 
 Why: WebProfilerBundle's `ContentSecurityPolicyHandler` keeps a `cspDisabled` flag that `ProfilerController` sets on `/_wdt/styles` and `/_profiler` pages and never resets. The service is shared, so the toolbar listener uses the same instance. In FrankenPHP worker mode (or any runtime that keeps the kernel between requests), once a worker has served a profiler request every later page loses its `Content-Security-Policy` header and the toolbar's inline `<script>` renders without a nonce. Non-shared, each consumer gets its own handler. The profiler paths never get a CSP from this bundle anyway (`csp.excluded_path_prefixes`). Set it to `false` only if you decorate or replace that service yourself.
+
+## rate_limit
+
+Per-client-IP "N per minute" sliding-window limit on configured paths. Off by default; needs `symfony/rate-limiter` (suggested). When enabled, registers `RateLimitSubscriber` (`kernel.request`, priority 32 — before the firewall at 8). The `Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiter` service (autowirable) is registered whenever `symfony/rate-limiter` is installed, even with `enabled: false`, for host guards whose limit comes from the database.
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `enabled` | `false` | `true` requires at least one `rules` entry; throws a `LogicException` at container build when `symfony/rate-limiter` is missing |
+| `cache_pool` | `cache.app` | PSR-6 pool service id holding the buckets; use a Redis-backed pool so every worker and replica shares them |
+| `priority` | `32` | `kernel.request` priority; keep it above the firewall (8) so throttled requests never reach credential lookups |
+| `rules.<name>.path_prefixes` | `[]` | Must start with `/`. Segment-aware: `/hooks/slack` matches `/hooks/slack` and `/hooks/slack/x`, not `/hooks/slackware`; a trailing `/` makes it a plain prefix |
+| `rules.<name>.path_patterns` | `[]` | PCRE patterns with delimiters, matched against `Request::getPathInfo()`; invalid patterns fail the container build |
+| `rules.<name>.methods` | `[]` | HTTP methods (upper-cased); empty means every method |
+| `rules.<name>.limit_per_minute` | `60` | Requests per client IP and sliding minute; `0` disables the rule |
+| `rules.<name>.limit_provider` | `null` | Service id implementing `Nowo\HttpHardeningBundle\RateLimit\RateLimitProviderInterface`; its value (read on every matching request) replaces `limit_per_minute` |
+
+Each rule needs at least one `path_prefixes` or `path_patterns` entry; rule names use letters, digits, `_`, `.` and `-` (the name separates the buckets: limiter id `nowo_http_hardening_<name>`). The first rule whose method and path match a **main** request applies. The bucket key is `PerMinuteRateLimiter::ipKey(Request::getClientIp())` (an `xxh128` hash; configure `framework.trusted_proxies` behind a proxy). Over the limit the request gets a `429` JSON response `{"message":"rate limit exceeded"}` with `Retry-After` (seconds until a token is free, between 1 and 60) and `Cache-Control: no-store, private`; the controller never runs.
+
+```yaml
+nowo_http_hardening:
+    rate_limit:
+        enabled: true
+        cache_pool: cache.app
+        rules:
+            webhooks:
+                path_prefixes: ['/hooks/slack', '/hooks/email']
+                limit_per_minute: 120
+            ingest:
+                path_patterns: ['#^/api/[^/]+/(?:envelope|otlp)(?:/|$)#']
+                methods: [POST]
+                limit_provider: App\RateLimit\IngestLimitFromSettings
+```

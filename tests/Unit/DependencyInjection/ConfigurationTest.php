@@ -106,4 +106,49 @@ final class ConfigurationTest extends TestCase
 
         self::assertFalse($config['web_profiler']['isolate_csp_handler']);
     }
+
+    public function testRateLimitDefaults(): void
+    {
+        $config = (new Processor())->processConfiguration(new Configuration(), [[]]);
+
+        self::assertSame(['enabled' => false, 'cache_pool' => 'cache.app', 'priority' => 32, 'rules' => []], $config['rate_limit']);
+    }
+
+    public function testRateLimitRuleDefaults(): void
+    {
+        $config = (new Processor())->processConfiguration(new Configuration(), [[
+            'rate_limit' => ['enabled' => true, 'rules' => ['hooks' => ['path_prefixes' => ['/hooks']]]],
+        ]]);
+
+        self::assertSame(
+            ['path_prefixes' => ['/hooks'], 'path_patterns' => [], 'methods' => [], 'limit_per_minute' => 60, 'limit_provider' => null],
+            $config['rate_limit']['rules']['hooks'],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function invalidRateLimits(): iterable
+    {
+        yield 'enabled without rules' => [['enabled' => true], 'rate_limit.enabled requires at least one rules entry'];
+        yield 'rule without paths' => [['rules' => ['hooks' => ['limit_per_minute' => 5]]], 'needs at least one path_prefixes or path_patterns'];
+        yield 'relative prefix' => [['rules' => ['hooks' => ['path_prefixes' => ['hooks']]]], 'must start with "/"'];
+        yield 'invalid pattern' => [['rules' => ['hooks' => ['path_patterns' => ['#(#']]]], 'is not a valid PCRE pattern'];
+        yield 'negative limit' => [['rules' => ['hooks' => ['path_prefixes' => ['/h'], 'limit_per_minute' => -1]]], 'limit_per_minute'];
+        yield 'rule name with spaces' => [['rules' => ['my hooks' => ['path_prefixes' => ['/h']]]], 'names may only contain'];
+        yield 'empty cache pool' => [['cache_pool' => ''], 'cache_pool'];
+    }
+
+    /**
+     * @param array<string, mixed> $rateLimit
+     */
+    #[DataProvider('invalidRateLimits')]
+    public function testInvalidRateLimitIsRejected(array $rateLimit, string $message): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage($message);
+
+        (new Processor())->processConfiguration(new Configuration(), [['rate_limit' => $rateLimit]]);
+    }
 }

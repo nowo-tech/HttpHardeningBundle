@@ -31,6 +31,7 @@ This bundle is **FrankenPHP worker mode friendly**.
 - **Canonical host** (opt-in) — single 301 from `www.` to the apex host of your public base URL
 - **Safe URLs** — `SafeInternalRedirect` service (open-redirect guard) and `SafeHref`, with optional `safe_internal_path()` / `safe_href()` Twig functions
 - **Bounded request body** — `BoundedRequestBody::read($request, $maxBytes)` streams the raw body with a hard cap (chunked bodies without `Content-Length` included) and throws a 413 `RequestBodyTooLargeException`
+- **Per-minute rate limit** (opt-in, needs `symfony/rate-limiter`) — `PerMinuteRateLimiter` service: one sliding-window "N per minute" limiter over `cache.app` whose limit is read at runtime (database settings), with a hashed client-IP bucket `ipKey()`; optional `rate_limit` rules answer **429** with `Retry-After` on path prefixes / patterns before the firewall, with a per-rule runtime `RateLimitProviderInterface`
 - **Worker-safe Web Profiler CSP** — in dev, WebProfilerBundle's CSP handler is made non-shared so a `/_wdt` or `/_profiler` request cannot strip the CSP header from later pages in FrankenPHP worker mode (`web_profiler.isolate_csp_handler`, on by default, no-op in prod)
 
 ## Quick start
@@ -39,13 +40,13 @@ This bundle is **FrankenPHP worker mode friendly**.
 composer require nowo-tech/http-hardening-bundle
 ```
 
-Security headers are on by default. Everything else (session strip, CSP, public cache, no-store paths, tenant existence mask, canonical host, safe-URL Twig functions) is opt-in — see [Configuration](docs/CONFIGURATION.md) and [Usage](docs/USAGE.md).
+Security headers are on by default. Everything else (session strip, CSP, public cache, no-store paths, tenant existence mask, canonical host, safe-URL Twig functions, rate limit) is opt-in — see [Configuration](docs/CONFIGURATION.md) and [Usage](docs/USAGE.md).
 
 ## Requirements
 
 - PHP ≥ 8.2
 - Symfony 7.4 or 8.x (`http-kernel`, `security-core`)
-- Optional: `twig/twig` (Twig helpers), `symfony/console` (lint command)
+- Optional: `twig/twig` (Twig helpers), `symfony/console` (lint command), `symfony/rate-limiter` (rate limit)
 
 ## Documentation
 
@@ -75,6 +76,12 @@ make test-coverage
 ```
 
 PHP statement coverage: **100%** (Clover gate ≥99% in CI).
+
+- PHP: 100%
+- TS/JS: N/A
+- Python: N/A
+
+Coverage exclusions (`@codeCoverageIgnore`): the `php://input` open failure in `BoundedRequestBody` and the "symfony/rate-limiter not installed" branch of the extension (the test suite always has it).
 
 ## License
 

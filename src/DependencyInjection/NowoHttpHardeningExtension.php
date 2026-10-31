@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle\DependencyInjection;
 
+use LogicException;
 use Nowo\HttpHardeningBundle\Command\LintCspNoncesCommand;
 use Nowo\HttpHardeningBundle\Csp\CspSourceProviderInterface;
 use Nowo\HttpHardeningBundle\Csp\InlineNonceLinter;
@@ -13,10 +14,12 @@ use Nowo\HttpHardeningBundle\EventSubscriber\CanonicalHostRedirectSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\ContentSecurityPolicySubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\NoStoreSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
+use Nowo\HttpHardeningBundle\EventSubscriber\RateLimitSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\SecurityHeadersSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\TenantExistenceMaskSubscriber;
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
 use Nowo\HttpHardeningBundle\Http\TrustedHostsEnvVarProcessor;
+use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiter;
 use Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface;
 use Nowo\HttpHardeningBundle\Twig\CspNonceExtension;
 use Nowo\HttpHardeningBundle\Twig\SafeUrlExtension;
@@ -26,6 +29,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Twig\Extension\AbstractExtension;
 
 use function is_string;
@@ -85,6 +89,7 @@ final class NowoHttpHardeningExtension extends Extension
         $this->loadCanonicalHost($config['canonical_host'], $container);
         $this->loadTrustedHosts($config['trusted_hosts'], $container);
         $this->loadSafeUrls($config['safe_urls'], $container);
+        $this->loadRateLimit($config['rate_limit'], $container);
 
         $container->setParameter(WebProfilerCspHandlerPass::ENABLED_PARAMETER, (bool) $config['web_profiler']['isolate_csp_handler']);
     }
@@ -276,6 +281,59 @@ final class NowoHttpHardeningExtension extends Extension
         $twig->setArgument('$safeInternalRedirect', new Reference(SafeInternalRedirect::class));
         $twig->addTag('twig.extension');
         $container->setDefinition(SafeUrlExtension::class, $twig);
+    }
+
+    /**
+     * The PerMinuteRateLimiter service (whenever symfony/rate-limiter is installed) and, when enabled, the
+     * kernel.request subscriber answering 429 on the configured rules.
+     *
+     * @param array<string, mixed> $rateLimit
+     */
+    private function loadRateLimit(array $rateLimit, ContainerBuilder $container): void
+    {
+        // The test suite always has symfony/rate-limiter.
+        // @codeCoverageIgnoreStart
+        if (!$this->classAvailable(RateLimiterFactory::class)) {
+            if (true === $rateLimit['enabled']) {
+                throw new LogicException('nowo_http_hardening.rate_limit.enabled requires symfony/rate-limiter (composer require symfony/rate-limiter).');
+            }
+
+            return;
+        }
+        // @codeCoverageIgnoreEnd
+
+        $limiter = new Definition(PerMinuteRateLimiter::class);
+        $limiter->setArgument('$cache', new Reference((string) $rateLimit['cache_pool']));
+        $container->setDefinition(PerMinuteRateLimiter::class, $limiter);
+
+        if (true !== $rateLimit['enabled']) {
+            return;
+        }
+
+        $rules = [];
+        $providers = [];
+        foreach ((array) $rateLimit['rules'] as $name => $rule) {
+            $rules[(string) $name] = [
+                'path_prefixes' => array_values(array_map(strval(...), (array) $rule['path_prefixes'])),
+                'path_patterns' => array_values(array_map(strval(...), (array) $rule['path_patterns'])),
+                'methods' => array_values(array_map(strval(...), (array) $rule['methods'])),
+                'limit_per_minute' => (int) $rule['limit_per_minute'],
+            ];
+            if (is_string($rule['limit_provider']) && '' !== $rule['limit_provider']) {
+                $providers[(string) $name] = new Reference($rule['limit_provider']);
+            }
+        }
+
+        $definition = new Definition(RateLimitSubscriber::class);
+        $definition->setArgument('$limiter', new Reference(PerMinuteRateLimiter::class));
+        $definition->setArgument('$rules', $rules);
+        $definition->setArgument('$limitProviders', $providers);
+        $definition->addTag('kernel.event_listener', [
+            'event' => 'kernel.request',
+            'method' => '__invoke',
+            'priority' => (int) $rateLimit['priority'],
+        ]);
+        $container->setDefinition(RateLimitSubscriber::class, $definition);
     }
 
     /**

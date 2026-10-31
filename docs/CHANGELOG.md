@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Per-minute rate limit** (needs `symfony/rate-limiter`, suggested): `RateLimit\PerMinuteRateLimiter` service (sliding window "N per minute" over a PSR-6 pool, `cache.app` by default, with the limit read at each call; `accept()`, `consume()` and the hashed `ipKey()` bucket), registered whenever `symfony/rate-limiter` is installed.
+- Opt-in `rate_limit` section (`enabled: false` by default): `RateLimitSubscriber` (`kernel.request`, priority 32, before the firewall) answers `429` JSON with `Retry-After` and `Cache-Control: no-store, private` per client IP on named rules (`path_prefixes` segment-aware, `path_patterns`, `methods`, `limit_per_minute`, optional runtime `limit_provider` implementing `RateLimit\RateLimitProviderInterface`).
+- `symfony/rate-limiter` in `require-dev` and `suggest`. Existing defaults and behaviour are unchanged.
+
 ## [1.7.2] - 2026-10-21
 
 PHPStan CI job, release-check starts with ensure-up, worktree-safe co-author check. See [UPGRADING](UPGRADING.md#to-172).
