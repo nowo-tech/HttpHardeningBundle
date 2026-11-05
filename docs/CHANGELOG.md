@@ -47,6 +47,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Request::getPathInfo()` while the router matches the decoded path, so `/%61dmin/keys` reached the `/admin/keys`
   route without `Cache-Control: no-store`. Patterns are now tried on the decoded path the router matches (and still on
   the raw path, so patterns written for encoded paths keep matching). New `Http\RouterPath::of()` helper.
+- **`rate_limit` and percent-encoded paths (FF-M2, since 1.8.0):** `rules.*.path_prefixes` / `path_patterns` were
+  matched against the raw `Request::getPathInfo()`, so `/%6Cogin` (routed to `/login`, and accepted by `form_login` /
+  `json_login` `check_path`) skipped the throttle of the `/login` rule. Prefixes and patterns are now tried on the
+  decoded path the router matches and on the raw path: a match on either applies the rule. The bucket is still per
+  rule and client IP (never per path), so plain and encoded spellings share it. A double-encoded path
+  (`/%256Cogin`) is decoded once, like the router, which does not route it to `/login` either.
+- **`tenant_existence_mask` and percent-encoded paths (FF-L3, since 1.7.0):** the patterns ran on the raw path, so
+  `/projects/%61bc…` (routed like `/projects/abc…`) answered the 403 instead of the masked 404, reopening the existence
+  oracle. Patterns are now tried on the decoded path first (its capture is the tenant id the route receives), then on
+  the raw path.
+- **`route_headers` `frame` and unusual host policies (FF-I6):** a directive preceded by a form feed
+  (`;\fframe-ancestors …`) and a comma-joined value (`default-src 'self', frame-ancestors …`) kept the host
+  `frame-ancestors`. Directives are now trimmed of every ASCII whitespace, and each comma-separated policy of a value
+  gets its own `frame-ancestors`.
+- **`route_headers` `robots` (FF-I2):** any control character (not only CR / LF) now fails the container build.
 
 ## [1.8.0] - 2026-10-31
 

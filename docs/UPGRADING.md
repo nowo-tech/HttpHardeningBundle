@@ -28,6 +28,17 @@ No breaking changes; the new `route_headers` list is empty by default. A host su
 `no_store.path_patterns` are now also tried on the percent-decoded path the router matches, so a percent-encoded URL
 of a protected page gets `no-store` too. Patterns that matched before still match; no change is needed.
 
+`rate_limit.rules.*.path_prefixes` / `path_patterns` are now also tried on the percent-decoded path the router matches,
+so `/%6Cogin` is throttled by the `/login` rule (and shares its bucket). `tenant_existence_mask.path_patterns` are tried
+on the decoded path first, so an encoded tenant URL gets the masked 404; the tenant id passed to
+`TenantAccessCheckerInterface::hasAnyAccess()` is then the decoded one (what the route receives). Rules and patterns
+that matched before still match; no change is needed. Review a `path_patterns` entry with a negative lookahead: an
+encoded spelling of the excluded path may now be throttled too (matching more only throttles more).
+
+`route_headers[].robots` must not contain any control character (tab, NUL, DEL… as well as CR / LF): such a value now
+fails the container build. A `frame` rule now also rewrites each policy of a comma-joined `Content-Security-Policy`
+value.
+
 ## To 1.8.0
 
 From **1.7.2**:

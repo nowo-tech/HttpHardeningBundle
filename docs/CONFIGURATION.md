@@ -124,7 +124,7 @@ Security headers per route (framing, referrer, robots, no-store). Empty by defau
 | `match.path_prefix` | `[]` | Must start with `/`. Segment-aware prefixes of the percent-decoded path the router matches (`rawurldecode(getPathInfo())`, decoded once like `UrlMatcher`): `/secrets` matches `/secrets`, `/secrets/…`, `/%73ecrets/…` and `/secrets%2F…`, not `/secretsauce` |
 | `frame` | `null` | `deny`: `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`; `sameorigin`: `SAMEORIGIN` + `frame-ancestors 'self'` |
 | `referrer` | `null` | `Referrer-Policy` value (validated against the standard tokens) |
-| `robots` | `null` | `X-Robots-Tag` value; `noindex` is short for `noindex, nofollow` |
+| `robots` | `null` | `X-Robots-Tag` value; `noindex` is short for `noindex, nofollow`. Control characters fail the container build |
 | `no_store` | `false` | `Cache-Control: no-store, private`, no `ETag` / `Last-Modified` |
 
 A rule needs at least one `match` list and at least one header option; anything else fails the container build. A
@@ -149,7 +149,7 @@ No existence oracle on tenant URLs. Off by default. Registers `TenantExistenceMa
 | Key | Default | Notes |
 |-----|---------|-------|
 | `enabled` | `false` | `true` requires at least one `path_patterns` entry |
-| `path_patterns` | `[]` | PCRE patterns with delimiters, matched against `Request::getPathInfo()`. The tenant id is the `tenant` named group, else the first capture group, e.g. `'#^/projects/(?<tenant>[0-9a-f-]{36})(?:/\|$)#i'`. Validated at container build: an invalid pattern or one without a capture group throws `InvalidConfigurationException` |
+| `path_patterns` | `[]` | PCRE patterns with delimiters, tried on the percent-decoded path the router matches (`rawurldecode(getPathInfo())`, so `/projects/%61bc…` is masked like `/projects/abc…`), then on the raw `getPathInfo()`. The tenant id is the `tenant` named group, else the first capture group, e.g. `'#^/projects/(?<tenant>[0-9a-f-]{36})(?:/\|$)#i'`. Validated at container build: an invalid pattern or one without a capture group throws `InvalidConfigurationException` |
 | `access_checker` | `null` | Service id implementing `Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface`. `null` uses the service named after the interface (the autowiring alias Symfony creates when the host has exactly one implementation) |
 | `priority` | `16` | `kernel.exception` priority; minimum `2` so it always runs before the firewall `ExceptionListener` (1) |
 
@@ -212,8 +212,8 @@ Per-client-IP "N per minute" sliding-window limit on configured paths. Off by de
 | `enabled` | `false` | `true` requires at least one `rules` entry; throws a `LogicException` at container build when `symfony/rate-limiter` is missing |
 | `cache_pool` | `cache.app` | PSR-6 pool service id holding the buckets; use a Redis-backed pool so every worker and replica shares them |
 | `priority` | `32` | `kernel.request` priority; keep it above the firewall (8) so throttled requests never reach credential lookups |
-| `rules.<name>.path_prefixes` | `[]` | Must start with `/`. Segment-aware: `/hooks/slack` matches `/hooks/slack` and `/hooks/slack/x`, not `/hooks/slackware`; a trailing `/` makes it a plain prefix |
-| `rules.<name>.path_patterns` | `[]` | PCRE patterns with delimiters, matched against `Request::getPathInfo()`; invalid patterns fail the container build |
+| `rules.<name>.path_prefixes` | `[]` | Must start with `/`. Segment-aware: `/hooks/slack` matches `/hooks/slack` and `/hooks/slack/x`, not `/hooks/slackware`; a trailing `/` makes it a plain prefix. Compared with the percent-decoded path the router matches and with the raw `getPathInfo()` (either applies the rule), so `/%68ooks/slack` is throttled too, in the same bucket |
+| `rules.<name>.path_patterns` | `[]` | PCRE patterns with delimiters, tried on the percent-decoded path the router matches and on the raw `getPathInfo()`; invalid patterns fail the container build |
 | `rules.<name>.methods` | `[]` | HTTP methods (upper-cased); empty means every method |
 | `rules.<name>.limit_per_minute` | `60` | Requests per client IP and sliding minute; `0` disables the rule |
 | `rules.<name>.limit_provider` | `null` | Service id implementing `Nowo\HttpHardeningBundle\RateLimit\RateLimitProviderInterface`; its value (read on every matching request) replaces `limit_per_minute` |
