@@ -75,6 +75,10 @@ final class RouteHeadersConfigurationTest extends TestCase
         yield 'unknown frame' => [['match' => ['route' => 'x'], 'frame' => 'allow-from'], 'frame must be'];
         yield 'unknown referrer' => [['match' => ['route' => 'x'], 'referrer' => 'none'], 'not a Referrer-Policy value'];
         yield 'multi-line robots' => [['match' => ['route' => 'x'], 'robots' => "noindex\r\nX-Evil: 1"], 'single-line'];
+        yield 'robots with NUL' => [['match' => ['route' => 'x'], 'robots' => "noindex\0"], 'control characters'];
+        yield 'robots with tab' => [['match' => ['route' => 'x'], 'robots' => "noindex,\tnofollow"], 'control characters'];
+        yield 'robots with DEL' => [['match' => ['route' => 'x'], 'robots' => "noindex\x7F"], 'control characters'];
+        yield 'robots with vertical tab' => [['match' => ['route' => 'x'], 'robots' => "noindex\vX"], 'control characters'];
         yield 'empty robots' => [['match' => ['route' => 'x'], 'robots' => ' '], 'single-line'];
         yield 'path prefix without leading slash' => [['match' => ['path_prefix' => 'secrets'], 'robots' => 'noindex'], 'path_prefix entries must start with "/"'];
         yield 'one path prefix without leading slash' => [['match' => ['path_prefix' => ['/ok', 'secrets']], 'robots' => 'noindex'], 'path_prefix entries must start with "/"'];

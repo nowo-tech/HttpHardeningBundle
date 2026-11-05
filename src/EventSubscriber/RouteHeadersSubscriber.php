@@ -56,6 +56,9 @@ final readonly class RouteHeadersSubscriber
     /** ASCII whitespace that ends a CSP directive name (space, tab, LF, FF, CR). */
     private const CSP_WHITESPACE = " \t\n\f\r";
 
+    /** Stripped around policies and directives: the CSP whitespace plus what PHP `trim()` strips (VT, NUL). */
+    private const CSP_TRIM = " \t\n\f\r\v\0";
+
     /** `robots: noindex` shorthand. */
     public const ROBOTS_NOINDEX = 'noindex, nofollow';
 
@@ -125,11 +128,27 @@ final readonly class RouteHeadersSubscriber
      *
      * The directive name ends at any ASCII whitespace (space, tab, LF, FF, CR) and is compared case-insensitively, so
      * `FRAME-ANCESTORS\thttps://evil.example` is removed too: browsers honour the first `frame-ancestors` only.
+     * Leading and trailing ASCII whitespace (form feed included, plus VT / NUL) is stripped like the CSP parser does. A
+     * comma-joined value holds several policies: each one gets its own `frame-ancestors` (commas cannot appear inside
+     * a policy).
      */
     public static function withFrameAncestors(string $policy, string $source): string
     {
+        $policies = array_values(array_filter(
+            explode(',', $policy),
+            static fn (string $single): bool => '' !== trim($single, self::CSP_TRIM),
+        ));
+        if ([] === $policies) {
+            $policies = [''];
+        }
+
+        return implode(', ', array_map(static fn (string $single): string => self::withFrameAncestorsInPolicy($single, $source), $policies));
+    }
+
+    private static function withFrameAncestorsInPolicy(string $policy, string $source): string
+    {
         $directives = array_values(array_filter(
-            array_map(trim(...), explode(';', $policy)),
+            array_map(static fn (string $directive): string => trim($directive, self::CSP_TRIM), explode(';', $policy)),
             static fn (string $directive): bool => '' !== $directive
                 && 'frame-ancestors' !== strtolower(substr($directive, 0, strcspn($directive, self::CSP_WHITESPACE))),
         ));

@@ -294,6 +294,35 @@ final class RouteHeadersSubscriberTest extends TestCase
         yield 'upper case + tab' => ["default-src 'self'; FRAME-ANCESTORS\thttps://evil.example"];
         yield 'mixed case + tabs' => ["default-src 'self';\tFrame-Ancestors\t\thttps://evil.example\t"];
         yield 'name alone' => ["default-src 'self'; frame-ancestors"];
+        yield 'leading form feed' => ["default-src 'self';\fframe-ancestors https://evil.example"];
+        yield 'leading vertical tab' => ["default-src 'self';\x0Bframe-ancestors https://evil.example"];
+        yield 'trailing form feed' => ["\fdefault-src 'self'\f;frame-ancestors https://evil.example\f"];
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function commaJoinedPolicies(): iterable
+    {
+        yield 'frame-ancestors right after the comma' => [
+            "default-src 'self', frame-ancestors https://evil.example",
+            "default-src 'self'; frame-ancestors 'none', frame-ancestors 'none'",
+        ];
+        yield 'two full policies' => [
+            "script-src 'self'; frame-ancestors *,img-src 'self'; frame-ancestors https://evil.example",
+            "script-src 'self'; frame-ancestors 'none', img-src 'self'; frame-ancestors 'none'",
+        ];
+        yield 'empty policies are dropped' => [
+            "default-src 'self', , \f",
+            "default-src 'self'; frame-ancestors 'none'",
+        ];
+        yield 'only commas' => [' , ', "frame-ancestors 'none'"];
+    }
+
+    #[DataProvider('commaJoinedPolicies')]
+    public function testCommaJoinedPoliciesEachGetFrameAncestors(string $policy, string $expected): void
+    {
+        self::assertSame($expected, RouteHeadersSubscriber::withFrameAncestors($policy, "'none'"));
     }
 
     #[DataProvider('whitespaceSeparatedFrameAncestors')]
