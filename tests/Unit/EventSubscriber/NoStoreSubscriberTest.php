@@ -31,6 +31,9 @@ final class NoStoreSubscriberTest extends TestCase
         yield 'account' => ['/account', true];
         yield 'project keys' => ['/projects/abc/keys', true];
         yield 'project settings child' => ['/projects/abc/settings/webhooks', true];
+        yield 'percent-encoded admin (router-decoded path)' => ['/%61dmin/mailer', true];
+        yield 'percent-encoded separator' => ['/projects/abc%2Fkeys', true];
+        yield 'double-encoded admin (no route either)' => ['/%2561dmin/mailer', false];
         yield 'admin lookalike' => ['/administrator', false];
         yield 'project overview' => ['/projects/abc', false];
         yield 'home' => ['/', false];
@@ -51,6 +54,14 @@ final class NoStoreSubscriberTest extends TestCase
         self::assertSame('max-age=60, public', $response->headers->get('Cache-Control'));
         self::assertTrue($response->headers->has('ETag'));
         self::assertTrue($response->headers->has('Last-Modified'));
+    }
+
+    public function testPatternWrittenForTheRawEncodedPathStillMatches(): void
+    {
+        $subscriber = new NoStoreSubscriber(['#^/caf%C3%A9(?:/|$)#']);
+
+        self::assertTrue($subscriber->matches(Request::create('/caf%C3%A9/menu')));
+        self::assertFalse($subscriber->matches(Request::create('/tea/menu')));
     }
 
     public function testMatchingRoute(): void

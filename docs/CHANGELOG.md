@@ -26,6 +26,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Headers per route** (`route_headers`, opt-in, KIT-69 from the Beacon v1.122.0 audit): `RouteHeadersSubscriber`
+  (`kernel.response` priority -1250, after the CSP nonce listener, the Web Profiler toolbar and `no_store`) applies, on
+  every response of main requests matching `match.route` / `match.route_prefix` / `match.path_prefix` (errors and
+  redirects included): `frame: deny|sameorigin` (`X-Frame-Options` + CSP `frame-ancestors`, merged into the existing
+  policy and report-only policy without dropping other directives), `referrer` (`Referrer-Policy`), `robots`
+  (`X-Robots-Tag`, `noindex` = `noindex, nofollow`) and `no_store`. Rules are validated at container build. Registered
+  only when a rule is configured; existing defaults and behaviour are unchanged. `match.path_prefix` must start with `/`
+  (checked at container build) and is compared, segment-aware, with the percent-decoded path the router matches
+  (`rawurldecode(getPathInfo())`, decoded once like `UrlMatcher`), so `/%73ecrets/abc` cannot reach the `/secrets/{id}`
+  route without the rule's headers. `frame` rewrites every value of a repeated `Content-Security-Policy` /
+  Report-Only header, and recognises `frame-ancestors` whatever its case and the ASCII whitespace after its name (tab,
+  form feed…). A rule replaces the global / host value even when that one is stricter (documented).
+
+### Security
+
+- **`no_store.path_patterns` and percent-encoded paths:** the patterns were matched against the raw
+  `Request::getPathInfo()` while the router matches the decoded path, so `/%61dmin/keys` reached the `/admin/keys`
+  route without `Cache-Control: no-store`. Patterns are now tried on the decoded path the router matches (and still on
+  the raw path, so patterns written for encoded paths keep matching). New `Http\RouterPath::of()` helper.
+- **`rate_limit` and percent-encoded paths (FF-M2, since 1.8.0):** `rules.*.path_prefixes` / `path_patterns` were
+  matched against the raw `Request::getPathInfo()`, so `/%6Cogin` (routed to `/login`, and accepted by `form_login` /
+  `json_login` `check_path`) skipped the throttle of the `/login` rule. Prefixes and patterns are now tried on the
+  decoded path the router matches and on the raw path: a match on either applies the rule. The bucket is still per
+  rule and client IP (never per path), so plain and encoded spellings share it. A double-encoded path
+  (`/%256Cogin`) is decoded once, like the router, which does not route it to `/login` either.
+- **`tenant_existence_mask` and percent-encoded paths (FF-L3, since 1.7.0):** the patterns ran on the raw path, so
+  `/projects/%61bc…` (routed like `/projects/abc…`) answered the 403 instead of the masked 404, reopening the existence
+  oracle. Patterns are now tried on the decoded path first (its capture is the tenant id the route receives), then on
+  the raw path.
+- **`rate_limit` and `HEAD` (FF-L4, since 1.8.0):** a rule with `methods: [GET]` did not match `HEAD`, which the
+  router sends to the same `GET` controller, so `HEAD /feed` was never throttled. A rule listing `GET` now also
+  matches `HEAD`, in the same bucket.
+- **`route_headers` `frame` and unusual host policies (FF-I6):** a directive preceded by a form feed
+  (`;\fframe-ancestors …`) and a comma-joined value (`default-src 'self', frame-ancestors …`) kept the host
+  `frame-ancestors`. Directives are now trimmed of every ASCII whitespace, and each comma-separated policy of a value
+  gets its own `frame-ancestors`.
+- **`route_headers` `robots` (FF-I2):** any control character (not only CR / LF) now fails the container build.
+
 ## [1.8.0] - 2026-10-31
 
 PerMinuteRateLimiter (runtime N-per-minute limit, hashed client IP) and opt-in rate_limit rules answering 429 with Retry-After. See [UPGRADING](UPGRADING.md#to-180).

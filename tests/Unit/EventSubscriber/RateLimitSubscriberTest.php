@@ -13,6 +13,11 @@ use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\Routing\Exception\ResourceNotFoundException;
+use Symfony\Component\Routing\Matcher\UrlMatcher;
+use Symfony\Component\Routing\RequestContext;
+use Symfony\Component\Routing\Route;
+use Symfony\Component\Routing\RouteCollection;
 
 final class RateLimitSubscriberTest extends TestCase
 {
@@ -31,6 +36,13 @@ final class RateLimitSubscriberTest extends TestCase
         yield 'pattern other method' => ['GET', '/api/abc/ingest', null];
         yield 'method lower case in request' => ['post', '/api/abc/ingest', 'ingest'];
         yield 'elsewhere' => ['GET', '/', null];
+        yield 'prefix single encoded byte' => ['GET', '/hooks/%73lack', 'hooks'];
+        yield 'prefix encoded slash' => ['GET', '/hooks%2Fslack', 'hooks'];
+        yield 'prefix fully encoded' => ['GET', '/%68%6F%6F%6B%73/%73%6C%61%63%6B', 'hooks'];
+        yield 'prefix double encoded' => ['GET', '/hooks/%2573lack', null];
+        yield 'plain prefix encoded' => ['GET', '/%70ublic/anything', 'public'];
+        yield 'pattern encoded' => ['POST', '/api/abc/%69ngest', 'ingest'];
+        yield 'pattern on the raw path only' => ['GET', '/raw/%41', 'raw'];
     }
 
     #[DataProvider('paths')]
@@ -165,12 +177,122 @@ final class RateLimitSubscriberTest extends TestCase
         self::assertSame(429, $blocked->getResponse()?->getStatusCode());
     }
 
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function loginSpellings(): iterable
+    {
+        yield 'plain' => ['/login'];
+        yield 'single encoded byte' => ['/%6Cogin'];
+        yield 'single encoded byte inside' => ['/l%6Fgin'];
+        yield 'hex upper case' => ['/%6c%6F%67%69%6E'];
+        yield 'fully encoded' => ['/%6C%6F%67%69%6E'];
+        yield 'double encoded' => ['/%256Cogin'];
+        yield 'lookalike' => ['/logins'];
+        yield 'front controller' => ['/index.php/%6Cogin'];
+    }
+
+    /**
+     * The throttle applies exactly when the router dispatches to the throttled route (FF-M2).
+     */
+    #[DataProvider('loginSpellings')]
+    public function testLoginThrottleFollowsTheRouter(string $uri): void
+    {
+        $routes = new RouteCollection();
+        $routes->add('login', new Route('/login'));
+        $request = $this->sapiRequest($uri);
+        try {
+            $routed = 'login' === (new UrlMatcher($routes, new RequestContext('', 'POST')))->matchRequest($request)['_route'];
+        } catch (ResourceNotFoundException) {
+            $routed = false;
+        }
+
+        $subscriber = new RateLimitSubscriber($this->limiter(), ['login' => $this->rule(['/login'], [], ['POST'], 3)]);
+        self::assertSame($routed ? 'login' : null, $subscriber->matchingRule($request));
+
+        $codes = [];
+        for ($i = 0; $i < 4; ++$i) {
+            $event = new RequestEvent($this->createStub(HttpKernelInterface::class), $this->sapiRequest($uri), HttpKernelInterface::MAIN_REQUEST);
+            $subscriber($event);
+            $codes[] = $event->getResponse()?->getStatusCode();
+        }
+        self::assertSame($routed ? [null, null, null, 429] : [null, null, null, null], $codes);
+    }
+
+    public function testGetRuleAlsoThrottlesHeadInTheSameBucket(): void
+    {
+        $subscriber = new RateLimitSubscriber($this->limiter(), ['feed' => $this->rule(['/feed'], [], ['GET'], 3)]);
+
+        self::assertSame('feed', $subscriber->matchingRule(Request::create('/feed', 'HEAD')));
+        self::assertSame('feed', $subscriber->matchingRule(Request::create('/%66eed', 'HEAD')));
+        self::assertNull($subscriber->matchingRule(Request::create('/feed', 'POST')));
+
+        $codes = [];
+        foreach (['HEAD', 'HEAD', 'HEAD', 'HEAD', 'GET'] as $method) {
+            $event = new RequestEvent($this->createStub(HttpKernelInterface::class), Request::create('/feed', $method, [], [], [], ['REMOTE_ADDR' => '192.0.2.10']), HttpKernelInterface::MAIN_REQUEST);
+            $subscriber($event);
+            $codes[] = $event->getResponse()?->getStatusCode();
+        }
+        self::assertSame([null, null, null, 429, 429], $codes, 'HEAD /feed gets a 429 after the limit, and shares the GET bucket.');
+    }
+
+    public function testHeadOnlyRuleDoesNotMatchGet(): void
+    {
+        $subscriber = new RateLimitSubscriber($this->limiter(), ['head' => $this->rule(['/feed'], [], ['HEAD'], 3)]);
+
+        self::assertSame('head', $subscriber->matchingRule(Request::create('/feed', 'HEAD')));
+        self::assertNull($subscriber->matchingRule(Request::create('/feed', 'GET')));
+    }
+
+    public function testEncodedAndPlainSpellingsShareOneBucket(): void
+    {
+        $subscriber = new RateLimitSubscriber($this->limiter(), [
+            'login' => $this->rule(['/login'], [], ['POST'], 3),
+            'ingest' => $this->rule([], ['#^/api/[^/]+/ingest$#'], ['POST'], 2),
+        ]);
+
+        $codes = [];
+        foreach (['/login', '/%6Cogin', '/%6C%6F%67%69%6E', '/l%6Fgin'] as $uri) {
+            $event = new RequestEvent($this->createStub(HttpKernelInterface::class), $this->sapiRequest($uri), HttpKernelInterface::MAIN_REQUEST);
+            $subscriber($event);
+            $codes[] = $event->getResponse()?->getStatusCode();
+        }
+        self::assertSame([null, null, null, 429], $codes);
+
+        $codes = [];
+        foreach (['/api/x/%69ngest', '/api/x/ingest', '/%61pi/x/ingest'] as $uri) {
+            $event = new RequestEvent($this->createStub(HttpKernelInterface::class), $this->sapiRequest($uri), HttpKernelInterface::MAIN_REQUEST);
+            $subscriber($event);
+            $codes[] = $event->getResponse()?->getStatusCode();
+        }
+        self::assertSame([null, null, 429], $codes);
+    }
+
+    /**
+     * A request built like a real SAPI one: raw `REQUEST_URI`, base path / front controller detected by Request.
+     */
+    private function sapiRequest(string $uri): Request
+    {
+        return new Request([], [], [], [], [], [
+            'REQUEST_URI' => $uri,
+            'SCRIPT_NAME' => '/index.php',
+            'SCRIPT_FILENAME' => '/app/public/index.php',
+            'PHP_SELF' => '/index.php',
+            'REQUEST_METHOD' => 'POST',
+            'HTTP_HOST' => 'localhost',
+            'SERVER_NAME' => 'localhost',
+            'SERVER_PORT' => 80,
+            'REMOTE_ADDR' => '192.0.2.10',
+        ]);
+    }
+
     private function subscriber(): RateLimitSubscriber
     {
         return new RateLimitSubscriber($this->limiter(), [
             'hooks' => $this->rule(['/hooks/slack'], limit: 2),
             'public' => $this->rule(['/public/'], limit: 2),
             'ingest' => $this->rule([], ['#^/api/[^/]+/ingest(?:/|$)#'], ['POST'], 2),
+            'raw' => $this->rule([], ['#^/raw/%41$#'], [], 2),
         ]);
     }
 

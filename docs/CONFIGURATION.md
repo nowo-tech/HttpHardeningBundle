@@ -9,6 +9,7 @@ Root key: `nowo_http_hardening`.
 - [csp](#csp)
 - [public_cache](#public_cache)
 - [no_store](#no_store)
+- [route_headers](#route_headers)
 - [tenant_existence_mask](#tenant_existence_mask)
 - [trusted_hosts](#trusted_hosts)
 - [canonical_host](#canonical_host)
@@ -106,10 +107,40 @@ Signed-in users, responses that set cookies, non-200 responses and `no-store` ar
 | Key | Default | Notes |
 |-----|---------|-------|
 | `enabled` | `false` | |
-| `path_patterns` | `[]` | PCRE patterns with delimiters, matched against `Request::getPathInfo()`, e.g. `'#^/admin(?:/\|$)#'`. Validated at container build: an invalid pattern throws `InvalidConfigurationException` |
+| `path_patterns` | `[]` | PCRE patterns with delimiters, e.g. `'#^/admin(?:/\|$)#'`, tried on the percent-decoded path the router matches (`rawurldecode(getPathInfo())`, so `/%61dmin` matches like `/admin`) and on the raw `getPathInfo()`. Validated at container build: an invalid pattern throws `InvalidConfigurationException` |
 | `routes` | `[]` | Exact route names (`_route` attribute) |
 
 On a matching **main** request `Cache-Control` is replaced with `no-store, private` and `ETag` / `Last-Modified` are removed. Sub-requests are ignored. It runs after the session listener (-1000), `anonymous_session_strip` (-1024) and `public_cache` (-1100), so `no-store` always wins.
+
+## route_headers
+
+Security headers per route (framing, referrer, robots, no-store). Empty by default; registers
+`RouteHeadersSubscriber` (`kernel.response` priority -1250) only when at least one rule is configured. Each entry:
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `match.route` | `[]` | Exact route names (string or list) |
+| `match.route_prefix` | `[]` | Route name prefixes, e.g. `secret_` (string or list) |
+| `match.path_prefix` | `[]` | Must start with `/`. Segment-aware prefixes of the percent-decoded path the router matches (`rawurldecode(getPathInfo())`, decoded once like `UrlMatcher`): `/secrets` matches `/secrets`, `/secrets/…`, `/%73ecrets/…` and `/secrets%2F…`, not `/secretsauce` |
+| `frame` | `null` | `deny`: `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`; `sameorigin`: `SAMEORIGIN` + `frame-ancestors 'self'` |
+| `referrer` | `null` | `Referrer-Policy` value (validated against the standard tokens) |
+| `robots` | `null` | `X-Robots-Tag` value; `noindex` is short for `noindex, nofollow`. Control characters fail the container build |
+| `no_store` | `false` | `Cache-Control: no-store, private`, no `ETag` / `Last-Modified` |
+
+A rule needs at least one `match` list and at least one header option; anything else fails the container build. A
+request matches when any of its lists matches. Matching rules apply in order (a later rule wins on the same header) on
+every response of the main request, errors and redirects included. `frame` replaces only the `frame-ancestors`
+directive of the policy already built (nonces and every other directive are kept), in `Content-Security-Policy` and,
+when present, `Content-Security-Policy-Report-Only`; without an enforced policy it adds `Content-Security-Policy:
+frame-ancestors '…'`. Every value of a repeated `Content-Security-Policy` (or Report-Only) header is rewritten and
+kept. The `frame-ancestors` directive is recognised whatever its case and whatever ASCII whitespace (space, tab, …)
+follows its name.
+
+A rule **replaces** the global or host value of each header it sets, even when the global one is stricter: `frame:
+sameorigin` over a global `X-Frame-Options: DENY` / `frame-ancestors 'none'`, `referrer: unsafe-url` over the default
+`strict-origin-when-cross-origin` or `robots: all` over a host `X-Robots-Tag: noindex` all loosen the route. Only
+`no_store: false` never undoes an earlier `no_store: true`. Rules are matched on the **main** request: a controller that
+`forward()`s to a protected route does not get that route's headers (match the forwarding route too).
 
 ## tenant_existence_mask
 
@@ -118,7 +149,7 @@ No existence oracle on tenant URLs. Off by default. Registers `TenantExistenceMa
 | Key | Default | Notes |
 |-----|---------|-------|
 | `enabled` | `false` | `true` requires at least one `path_patterns` entry |
-| `path_patterns` | `[]` | PCRE patterns with delimiters, matched against `Request::getPathInfo()`. The tenant id is the `tenant` named group, else the first capture group, e.g. `'#^/projects/(?<tenant>[0-9a-f-]{36})(?:/\|$)#i'`. Validated at container build: an invalid pattern or one without a capture group throws `InvalidConfigurationException` |
+| `path_patterns` | `[]` | PCRE patterns with delimiters, tried on the percent-decoded path the router matches (`rawurldecode(getPathInfo())`, so `/projects/%61bc…` is masked like `/projects/abc…`), then on the raw `getPathInfo()`. The tenant id is the `tenant` named group, else the first capture group, e.g. `'#^/projects/(?<tenant>[0-9a-f-]{36})(?:/\|$)#i'`. Validated at container build: an invalid pattern or one without a capture group throws `InvalidConfigurationException` |
 | `access_checker` | `null` | Service id implementing `Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface`. `null` uses the service named after the interface (the autowiring alias Symfony creates when the host has exactly one implementation) |
 | `priority` | `16` | `kernel.exception` priority; minimum `2` so it always runs before the firewall `ExceptionListener` (1) |
 
@@ -181,13 +212,15 @@ Per-client-IP "N per minute" sliding-window limit on configured paths. Off by de
 | `enabled` | `false` | `true` requires at least one `rules` entry; throws a `LogicException` at container build when `symfony/rate-limiter` is missing |
 | `cache_pool` | `cache.app` | PSR-6 pool service id holding the buckets; use a Redis-backed pool so every worker and replica shares them |
 | `priority` | `32` | `kernel.request` priority; keep it above the firewall (8) so throttled requests never reach credential lookups |
-| `rules.<name>.path_prefixes` | `[]` | Must start with `/`. Segment-aware: `/hooks/slack` matches `/hooks/slack` and `/hooks/slack/x`, not `/hooks/slackware`; a trailing `/` makes it a plain prefix |
-| `rules.<name>.path_patterns` | `[]` | PCRE patterns with delimiters, matched against `Request::getPathInfo()`; invalid patterns fail the container build |
-| `rules.<name>.methods` | `[]` | HTTP methods (upper-cased); empty means every method |
+| `rules.<name>.path_prefixes` | `[]` | Must start with `/`. Segment-aware: `/hooks/slack` matches `/hooks/slack` and `/hooks/slack/x`, not `/hooks/slackware`; a trailing `/` makes it a plain prefix. Compared with the percent-decoded path the router matches and with the raw `getPathInfo()` (either applies the rule), so `/%68ooks/slack` is throttled too, in the same bucket |
+| `rules.<name>.path_patterns` | `[]` | PCRE patterns with delimiters, tried on the percent-decoded path the router matches and on the raw `getPathInfo()`; invalid patterns fail the container build |
+| `rules.<name>.methods` | `[]` | HTTP methods (upper-cased); empty means every method. `GET` also matches `HEAD` (the router sends `HEAD` to the `GET` controller) |
 | `rules.<name>.limit_per_minute` | `60` | Requests per client IP and sliding minute; `0` disables the rule |
 | `rules.<name>.limit_provider` | `null` | Service id implementing `Nowo\HttpHardeningBundle\RateLimit\RateLimitProviderInterface`; its value (read on every matching request) replaces `limit_per_minute` |
 
 Each rule needs at least one `path_prefixes` or `path_patterns` entry; rule names use letters, digits, `_`, `.` and `-` (the name separates the buckets: limiter id `nowo_http_hardening_<name>`). The first rule whose method and path match a **main** request applies. The bucket key is `PerMinuteRateLimiter::ipKey(Request::getClientIp())` (an `xxh128` hash; configure `framework.trusted_proxies` behind a proxy). Over the limit the request gets a `429` JSON response `{"message":"rate limit exceeded"}` with `Retry-After` (seconds until a token is free, between 1 and 60) and `Cache-Control: no-store, private`; the controller never runs.
+
+`path_patterns` with the `u` modifier (here, in `no_store` and in `tenant_existence_mask`) never match a path whose decoded form is invalid UTF-8 (`preg_match` fails). The router only dispatches such a path to a route compiled **without** `utf8`, so keep the FrameworkBundle default `framework.router.utf8: true`, or leave the `u` modifier off these patterns.
 
 ```yaml
 nowo_http_hardening:

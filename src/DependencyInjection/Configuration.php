@@ -7,6 +7,7 @@ namespace Nowo\HttpHardeningBundle\DependencyInjection;
 use Nowo\HttpHardeningBundle\EventSubscriber\ContentSecurityPolicySubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\RateLimitSubscriber;
+use Nowo\HttpHardeningBundle\EventSubscriber\RouteHeadersSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\TenantExistenceMaskSubscriber;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
@@ -15,12 +16,14 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
 use function array_filter;
 use function array_keys;
 use function array_map;
+use function in_array;
 use function is_array;
 use function is_string;
 use function preg_match;
 use function sprintf;
 use function str_starts_with;
 use function strtoupper;
+use function trim;
 
 /**
  * @author Héctor Franco Aceituno <hectorfranco@nowo.tech>
@@ -29,6 +32,18 @@ use function strtoupper;
 final class Configuration implements ConfigurationInterface
 {
     public const ALIAS = 'nowo_http_hardening';
+
+    /** Values accepted by `route_headers[].referrer`. */
+    public const REFERRER_POLICIES = [
+        'no-referrer',
+        'no-referrer-when-downgrade',
+        'origin',
+        'origin-when-cross-origin',
+        'same-origin',
+        'strict-origin',
+        'strict-origin-when-cross-origin',
+        'unsafe-url',
+    ];
 
     public function getConfigTreeBuilder(): TreeBuilder
     {
@@ -77,6 +92,7 @@ final class Configuration implements ConfigurationInterface
         $this->addCspSection($root);
         $this->addPublicCacheSection($root);
         $this->addNoStoreSection($root);
+        $this->addRouteHeadersSection($root);
         $this->addTenantExistenceMaskSection($root);
         $this->addCanonicalHostSection($root);
         $this->addSafeUrlsSection($root);
@@ -180,6 +196,80 @@ final class Configuration implements ConfigurationInterface
                             ->defaultValue('REMEMBERME')
                         ->end()
                     ->end()
+                ->end()
+            ->end();
+    }
+
+    private function addRouteHeadersSection(ArrayNodeDefinition $root): void
+    {
+        $prefixList = static function (string $name, string $info): ArrayNodeDefinition {
+            $node = new ArrayNodeDefinition($name);
+            $node
+                ->info($info)
+                ->beforeNormalization()->castToArray()->end()
+                ->scalarPrototype()->cannotBeEmpty()->end()
+                ->defaultValue([]);
+
+            return $node;
+        };
+
+        $root
+            ->children()
+                ->arrayNode('route_headers')
+                    ->info('Security headers per route: framing, referrer, robots and no-store for matching main requests (errors and redirects included).')
+                    ->arrayPrototype()
+                        ->children()
+                            ->arrayNode('match')
+                                ->isRequired()
+                                ->children()
+                                    ->append($prefixList('route', 'Exact route names (string or list).'))
+                                    ->append($prefixList('route_prefix', 'Route name prefixes, e.g. "secret_" (string or list).'))
+                                    ->append($prefixList('path_prefix', 'Segment-aware prefixes of the percent-decoded path the router matches, e.g. "/secrets" (string or list, each must start with "/").')
+                                        ->validate()
+                                            ->ifTrue(static fn (array $prefixes): bool => [] !== array_filter($prefixes, static fn (mixed $prefix): bool => !is_string($prefix) || !str_starts_with($prefix, '/')))
+                                            ->thenInvalid('route_headers[].match.path_prefix entries must start with "/", got %s.')
+                                        ->end())
+                                ->end()
+                                ->validate()
+                                    ->ifTrue(static fn (array $match): bool => [] === $match['route'] && [] === $match['route_prefix'] && [] === $match['path_prefix'])
+                                    ->thenInvalid('route_headers[].match needs at least one of route, route_prefix or path_prefix.')
+                                ->end()
+                            ->end()
+                            ->scalarNode('frame')
+                                ->info("deny: X-Frame-Options DENY + frame-ancestors 'none'; sameorigin: SAMEORIGIN + frame-ancestors 'self'.")
+                                ->defaultNull()
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $frame): bool => null !== $frame && !isset(RouteHeadersSubscriber::FRAME_VALUES[$frame]))
+                                    ->thenInvalid('route_headers[].frame must be "deny" or "sameorigin", got %s.')
+                                ->end()
+                            ->end()
+                            ->scalarNode('referrer')
+                                ->info('Referrer-Policy value, e.g. "no-referrer".')
+                                ->defaultNull()
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $referrer): bool => null !== $referrer && !in_array($referrer, self::REFERRER_POLICIES, true))
+                                    ->thenInvalid('route_headers[].referrer %s is not a Referrer-Policy value.')
+                                ->end()
+                            ->end()
+                            ->scalarNode('robots')
+                                ->info('X-Robots-Tag value; "noindex" is short for "noindex, nofollow".')
+                                ->defaultNull()
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $robots): bool => null !== $robots && (!is_string($robots) || '' === trim($robots) || 1 === preg_match('/[\x00-\x1F\x7F]/', $robots)))
+                                    ->thenInvalid('route_headers[].robots must be a non-empty single-line string without control characters, got %s.')
+                                ->end()
+                            ->end()
+                            ->booleanNode('no_store')
+                                ->info('Cache-Control: no-store, private (and no ETag / Last-Modified).')
+                                ->defaultFalse()
+                            ->end()
+                        ->end()
+                        ->validate()
+                            ->ifTrue(static fn (array $rule): bool => null === $rule['frame'] && null === $rule['referrer'] && null === $rule['robots'] && !$rule['no_store'])
+                            ->thenInvalid('A route_headers rule needs at least one of frame, referrer, robots or no_store.')
+                        ->end()
+                    ->end()
+                    ->defaultValue([])
                 ->end()
             ->end();
     }

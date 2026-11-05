@@ -27,6 +27,7 @@ This bundle is **FrankenPHP worker mode friendly**.
 - **CSP nonce lint** — `nowo:http-hardening:lint-csp-nonces [dirs...]` fails on inline Twig blocks without a nonce (CI-friendly)
 - **Public cache** (opt-in) — `private, max-age=120, must-revalidate` + `Vary: Cookie` on anonymous public pages, `public` policy on crawler/PWA files, no ETag on nonce'd HTML; coexists with the session strip
 - **No-store paths** (opt-in) — `Cache-Control: no-store, private` and no `ETag` / `Last-Modified` on paths (PCRE) or routes holding credentials; wins over every other cache policy
+- **Headers per route** (opt-in, `route_headers`) — `frame: deny` (CSP `frame-ancestors 'none'` merged into the policy + `X-Frame-Options: DENY`), `Referrer-Policy`, `X-Robots-Tag` and no-store for routes, route prefixes or path prefixes; errors and redirects included
 - **Tenant existence mask** (opt-in) — no existence oracle on tenant URLs: an access denial on `/projects/{id}/…`-style paths answers **404** (like an unknown id) for a signed-in user with no access at all to that tenant; members with a too-low role keep 403. The host implements `TenantAccessCheckerInterface`
 - **Canonical host** (opt-in) — single 301 from `www.` to the apex host of your public base URL
 - **Safe URLs** — `SafeInternalRedirect` service (open-redirect guard) and `SafeHref`, with optional `safe_internal_path()` / `safe_href()` Twig functions
@@ -40,7 +41,7 @@ This bundle is **FrankenPHP worker mode friendly**.
 composer require nowo-tech/http-hardening-bundle
 ```
 
-Security headers are on by default. Everything else (session strip, CSP, public cache, no-store paths, tenant existence mask, canonical host, safe-URL Twig functions, rate limit) is opt-in — see [Configuration](docs/CONFIGURATION.md) and [Usage](docs/USAGE.md).
+Security headers are on by default. Everything else (session strip, CSP, public cache, no-store paths, headers per route, tenant existence mask, canonical host, safe-URL Twig functions, rate limit) is opt-in — see [Configuration](docs/CONFIGURATION.md) and [Usage](docs/USAGE.md).
 
 ## Requirements
 

@@ -130,6 +130,60 @@ final class TenantExistenceMaskSubscriberTest extends TestCase
         self::assertNull($subscriber->tenantId('/'));
     }
 
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function encodedTenantPaths(): iterable
+    {
+        yield 'single encoded byte' => ['/projects/%61bcd/settings', 'abcd'];
+        yield 'fully encoded tenant' => ['/projects/%61%62%63%64', 'abcd'];
+        yield 'encoded area' => ['/%70rojects/abcd', 'abcd'];
+        yield 'encoded slash' => ['/projects%2Fabcd', 'abcd'];
+    }
+
+    /**
+     * An encoded tenant URL (routed like the plain one) gets the masked 404 too, with the decoded id (FF-L3).
+     */
+    #[DataProvider('encodedTenantPaths')]
+    public function testEncodedTenantPathIsMasked(string $path, string $tenantId): void
+    {
+        $checker = new RecordingChecker([]);
+        $event = $this->dispatch(new AccessDeniedException(), $path, 'stranger', $checker);
+
+        self::assertInstanceOf(NotFoundHttpException::class, $event->getThrowable());
+        self::assertSame([['stranger', $tenantId]], $checker->calls);
+    }
+
+    public function testEncodedTenantPathOfAMemberKeeps403(): void
+    {
+        $denial = new AccessDeniedException();
+        $event = $this->dispatch($denial, '/projects/%61bcd', 'member', new RecordingChecker(['member' => ['abcd']]));
+
+        self::assertSame($denial, $event->getThrowable());
+    }
+
+    public function testDoubleEncodedTenantPathIsLeftAlone(): void
+    {
+        $denial = new AccessDeniedException();
+        $checker = new RecordingChecker([]);
+        $event = $this->dispatch($denial, '/projects/%2561bcd', 'stranger', $checker);
+
+        self::assertSame($denial, $event->getThrowable(), 'Decoded once like the router: /projects/%61bcd is not a tenant URL.');
+        self::assertSame([], $checker->calls);
+    }
+
+    public function testPatternWrittenForTheRawPathStillMatches(): void
+    {
+        $checker = new RecordingChecker([]);
+        $event = $this->event(new AccessDeniedException(), '/raw/%41/x');
+        $tokenStorage = new TokenStorage();
+        $tokenStorage->setToken(new UsernamePasswordToken(new InMemoryUser('stranger', null, ['ROLE_USER']), 'main', ['ROLE_USER']));
+        (new TenantExistenceMaskSubscriber($tokenStorage, $checker, ['#^/raw/(%41)/#']))->onException($event);
+
+        self::assertInstanceOf(NotFoundHttpException::class, $event->getThrowable());
+        self::assertSame([['stranger', '%41']], $checker->calls);
+    }
+
     private function dispatch(Throwable $throwable, string $path, ?string $username, RecordingChecker $checker): ExceptionEvent
     {
         $tokenStorage = new TokenStorage();

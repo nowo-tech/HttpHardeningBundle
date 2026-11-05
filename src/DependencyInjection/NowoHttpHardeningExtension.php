@@ -15,6 +15,7 @@ use Nowo\HttpHardeningBundle\EventSubscriber\ContentSecurityPolicySubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\NoStoreSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\PublicCacheControlSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\RateLimitSubscriber;
+use Nowo\HttpHardeningBundle\EventSubscriber\RouteHeadersSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\SecurityHeadersSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\TenantExistenceMaskSubscriber;
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
@@ -85,6 +86,7 @@ final class NowoHttpHardeningExtension extends Extension
         $this->loadCsp($config['csp'], $container);
         $this->loadPublicCache($config['public_cache'], $container);
         $this->loadNoStore($config['no_store'], $container);
+        $this->loadRouteHeaders($config['route_headers'], $container);
         $this->loadTenantExistenceMask($config['tenant_existence_mask'], $container);
         $this->loadCanonicalHost($config['canonical_host'], $container);
         $this->loadTrustedHosts($config['trusted_hosts'], $container);
@@ -200,6 +202,40 @@ final class NowoHttpHardeningExtension extends Extension
             'priority' => NoStoreSubscriber::PRIORITY,
         ]);
         $container->setDefinition(NoStoreSubscriber::class, $definition);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rules
+     */
+    private function loadRouteHeaders(array $rules, ContainerBuilder $container): void
+    {
+        if ([] === $rules) {
+            return;
+        }
+
+        $normalized = [];
+        foreach ($rules as $rule) {
+            $match = (array) $rule['match'];
+            $normalized[] = [
+                'route' => array_values(array_map(strval(...), (array) $match['route'])),
+                'route_prefix' => array_values(array_map(strval(...), (array) $match['route_prefix'])),
+                'path_prefix' => array_values(array_map(strval(...), (array) $match['path_prefix'])),
+                'frame' => null === $rule['frame'] ? null : (string) $rule['frame'],
+                'referrer' => null === $rule['referrer'] ? null : (string) $rule['referrer'],
+                'robots' => null === $rule['robots'] ? null : (string) $rule['robots'],
+                'no_store' => (bool) $rule['no_store'],
+            ];
+        }
+
+        $definition = new Definition(RouteHeadersSubscriber::class);
+        $definition->setArgument('$rules', $normalized);
+        // After the CSP (-100), the toolbar nonces (-128) and no_store (-1200): the last word on these headers.
+        $definition->addTag('kernel.event_listener', [
+            'event' => 'kernel.response',
+            'method' => '__invoke',
+            'priority' => RouteHeadersSubscriber::PRIORITY,
+        ]);
+        $container->setDefinition(RouteHeadersSubscriber::class, $definition);
     }
 
     /**

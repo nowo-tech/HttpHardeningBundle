@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle\EventSubscriber;
 
+use Nowo\HttpHardeningBundle\Http\RouterPath;
 use Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -23,6 +24,10 @@ use function is_string;
  * by a plain `NotFoundHttpException`: a stranger gets exactly the answer of an unknown tenant id and cannot
  * enumerate which ids exist. Members whose role is too low keep their 403; anonymous visitors are left alone (the
  * firewall still sends them to the login / entry point).
+ *
+ * Patterns are tried on the percent-decoded path the router matches ({@see RouterPath::of()}), whose capture is the
+ * tenant id the route receives, then (when it differs) on the raw `Request::getPathInfo()`: `/projects/%61bc` is
+ * routed like `/projects/abc` and is masked like it.
  *
  * The replacement carries **no** `previous` exception: the firewall `ExceptionListener` walks the exception chain
  * and would turn a nested `AccessDeniedException` back into a 403.
@@ -58,7 +63,10 @@ final readonly class TenantExistenceMaskSubscriber
             return;
         }
 
-        $tenantId = $this->tenantId($event->getRequest()->getPathInfo());
+        $request = $event->getRequest();
+        $rawPath = $request->getPathInfo();
+        $routerPath = RouterPath::of($request);
+        $tenantId = $this->tenantId($routerPath) ?? ($rawPath !== $routerPath ? $this->tenantId($rawPath) : null);
         if (null === $tenantId) {
             return;
         }

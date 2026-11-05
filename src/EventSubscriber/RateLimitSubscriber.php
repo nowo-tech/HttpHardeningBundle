@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle\EventSubscriber;
 
+use Nowo\HttpHardeningBundle\Http\RouterPath;
 use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiter;
 use Nowo\HttpHardeningBundle\RateLimit\RateLimitProviderInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -25,11 +26,15 @@ use function strtoupper;
 /**
  * Per-client-IP "N per minute" limit on configured paths: an exceeded main request answers 429 with `Retry-After`.
  *
- * Each rule matches `Request::getPathInfo()` by path prefix (segment-aware: `/hooks/slack` matches `/hooks/slack`
- * and `/hooks/slack/x`, not `/hooks/slackware`; a prefix ending with `/` is a plain prefix) or PCRE pattern, and
- * optionally by HTTP method. The first matching rule wins. Its limit is the configured `limit_per_minute`, or the
+ * Each rule matches the request path by path prefix (segment-aware: `/hooks/slack` matches `/hooks/slack` and
+ * `/hooks/slack/x`, not `/hooks/slackware`; a prefix ending with `/` is a plain prefix) or PCRE pattern, and
+ * optionally by HTTP method (a rule listing `GET` also matches `HEAD`, which the router sends to the `GET`
+ * controller). The first matching rule wins. Prefixes and patterns are tried on the percent-decoded
+ * path the router matches ({@see RouterPath::of()}) and, when it differs, on the raw `Request::getPathInfo()`: a
+ * match on either applies the rule, so `/%6Cogin` (routed to `/login`) cannot skip the throttle of `/login`. Its limit is the configured `limit_per_minute`, or the
  * value of its {@see RateLimitProviderInterface} read on each request (runtime settings); `0` disables the rule.
- * The bucket is {@see PerMinuteRateLimiter::ipKey()} of `Request::getClientIp()` (configure trusted proxies).
+ * The bucket is {@see PerMinuteRateLimiter::ipKey()} of `Request::getClientIp()` (configure trusted proxies), per
+ * rule and never per path: the plain and percent-encoded spellings of a URL share one bucket.
  *
  * Registered on `kernel.request` before the firewall (default priority 32), so throttled requests never reach
  * credential lookups. Readonly, no request data kept (FrankenPHP worker-safe).
@@ -93,19 +98,35 @@ final readonly class RateLimitSubscriber
      */
     public function matchingRule(Request $request): ?string
     {
-        $path = $request->getPathInfo();
+        $rawPath = $request->getPathInfo();
+        $routerPath = RouterPath::of($request);
         $method = strtoupper($request->getMethod());
 
         foreach ($this->rules as $name => $rule) {
-            if ([] !== $rule['methods'] && !in_array($method, $rule['methods'], true)) {
+            if (!$this->methodMatches($method, $rule['methods'])) {
                 continue;
             }
-            if ($this->pathMatches($path, $rule)) {
+            // Matching more only throttles more: the decoded path follows the router, the raw one keeps rules
+            // written for encoded paths working.
+            if ($this->pathMatches($routerPath, $rule) || ($rawPath !== $routerPath && $this->pathMatches($rawPath, $rule))) {
                 return $name;
             }
         }
 
         return null;
+    }
+
+    /**
+     * An empty list matches every method. A list with `GET` also matches `HEAD`, like the router, which sends a
+     * `HEAD` request to the `GET` controller (same rule, same bucket).
+     *
+     * @param list<string> $methods upper-cased
+     */
+    private function methodMatches(string $method, array $methods): bool
+    {
+        return [] === $methods
+            || in_array($method, $methods, true)
+            || ('HEAD' === $method && in_array('GET', $methods, true));
     }
 
     /**
