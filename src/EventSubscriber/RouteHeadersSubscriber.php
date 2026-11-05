@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle\EventSubscriber;
 
+use Nowo\HttpHardeningBundle\Http\RouterPath;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
@@ -17,7 +18,9 @@ use function in_array;
 use function is_string;
 use function rtrim;
 use function str_starts_with;
+use function strcspn;
 use function strtolower;
+use function substr;
 use function trim;
 
 /**
@@ -50,6 +53,9 @@ final readonly class RouteHeadersSubscriber
         'sameorigin' => ['SAMEORIGIN', "'self'"],
     ];
 
+    /** ASCII whitespace that ends a CSP directive name (space, tab, LF, FF, CR). */
+    private const CSP_WHITESPACE = " \t\n\f\r";
+
     /** `robots: noindex` shorthand. */
     public const ROBOTS_NOINDEX = 'noindex, nofollow';
 
@@ -79,6 +85,9 @@ final readonly class RouteHeadersSubscriber
     /**
      * Whether a rule matches the request (route name, route name prefix or segment-aware path prefix).
      *
+     * Path prefixes are compared with {@see RouterPath::of()} (the percent-decoded path the router matches), so an
+     * encoded byte cannot reach a protected route without its headers.
+     *
      * @param array{route?: list<string>, route_prefix?: list<string>, path_prefix?: list<string>} $rule
      */
     public function matches(array $rule, Request $request): bool
@@ -95,7 +104,8 @@ final readonly class RouteHeadersSubscriber
             }
         }
 
-        $path = $request->getPathInfo();
+        // The decoded path the router matches: "/%73ecrets/abc" reaches the "/secrets/{id}" route, so it must match too.
+        $path = RouterPath::of($request);
         foreach ($rule['path_prefix'] ?? [] as $prefix) {
             $prefix = rtrim($prefix, '/');
             if ('' === $prefix) {
@@ -112,13 +122,16 @@ final readonly class RouteHeadersSubscriber
 
     /**
      * A policy with its `frame-ancestors` directive replaced (or appended), every other directive kept.
+     *
+     * The directive name ends at any ASCII whitespace (space, tab, LF, FF, CR) and is compared case-insensitively, so
+     * `FRAME-ANCESTORS\thttps://evil.example` is removed too: browsers honour the first `frame-ancestors` only.
      */
     public static function withFrameAncestors(string $policy, string $source): string
     {
         $directives = array_values(array_filter(
             array_map(trim(...), explode(';', $policy)),
             static fn (string $directive): bool => '' !== $directive
-                && 'frame-ancestors' !== strtolower(explode(' ', $directive, 2)[0]),
+                && 'frame-ancestors' !== strtolower(substr($directive, 0, strcspn($directive, self::CSP_WHITESPACE))),
         ));
         $directives[] = 'frame-ancestors '.$source;
 
@@ -134,9 +147,10 @@ final readonly class RouteHeadersSubscriber
         if (is_string($frame) && isset(self::FRAME_VALUES[$frame])) {
             [$xFrameOptions, $ancestors] = self::FRAME_VALUES[$frame];
             $headers->set('X-Frame-Options', $xFrameOptions);
-            $headers->set('Content-Security-Policy', self::withFrameAncestors((string) $headers->get('Content-Security-Policy', ''), $ancestors));
+            $policies = self::rewritePolicies($headers, 'Content-Security-Policy', $ancestors);
+            $headers->set('Content-Security-Policy', [] !== $policies ? $policies : self::withFrameAncestors('', $ancestors));
             if ($headers->has('Content-Security-Policy-Report-Only')) {
-                $headers->set('Content-Security-Policy-Report-Only', self::withFrameAncestors((string) $headers->get('Content-Security-Policy-Report-Only', ''), $ancestors));
+                $headers->set('Content-Security-Policy-Report-Only', self::rewritePolicies($headers, 'Content-Security-Policy-Report-Only', $ancestors));
             }
         }
 
@@ -156,5 +170,21 @@ final readonly class RouteHeadersSubscriber
             $headers->remove('ETag');
             $headers->remove('Last-Modified');
         }
+    }
+
+    /**
+     * Every value of a (possibly repeated) policy header with its `frame-ancestors` rewritten: each enforced policy
+     * is kept, none is collapsed into the first one.
+     *
+     * @return list<string>
+     */
+    private static function rewritePolicies(ResponseHeaderBag $headers, string $name, string $ancestors): array
+    {
+        $policies = [];
+        foreach ($headers->all($name) as $policy) {
+            $policies[] = self::withFrameAncestors((string) $policy, $ancestors);
+        }
+
+        return $policies;
     }
 }

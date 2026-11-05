@@ -13,6 +13,11 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\Routing\Exception\ResourceNotFoundException;
+use Symfony\Component\Routing\Matcher\UrlMatcher;
+use Symfony\Component\Routing\RequestContext;
+use Symfony\Component\Routing\Route;
+use Symfony\Component\Routing\RouteCollection;
 
 final class RouteHeadersSubscriberTest extends TestCase
 {
@@ -138,6 +143,9 @@ final class RouteHeadersSubscriberTest extends TestCase
         yield 'path prefix' => [['path_prefix' => ['/secrets']], '/secrets', null, true];
         yield 'path prefix child' => [['path_prefix' => ['/secrets/']], '/secrets/abc', null, true];
         yield 'path prefix lookalike' => [['path_prefix' => ['/secrets']], '/secretsauce', null, false];
+        yield 'percent-encoded path prefix' => [['path_prefix' => ['/secrets']], '/%73ecrets/abc', null, true];
+        yield 'percent-encoded separator' => [['path_prefix' => ['/secrets']], '/secrets%2Fabc', null, true];
+        yield 'double-encoded path prefix' => [['path_prefix' => ['/secrets']], '/%2573ecrets/abc', null, false];
         yield 'root path prefix' => [['path_prefix' => ['/']], '/anything', null, true];
         yield 'any of the lists' => [['route' => ['x'], 'route_prefix' => ['y_'], 'path_prefix' => ['/z']], '/z/1', 'other', true];
         yield 'empty rule' => [[], '/', 'home', false];
@@ -160,6 +168,80 @@ final class RouteHeadersSubscriberTest extends TestCase
 
         self::assertSame($expected, (new RouteHeadersSubscriber())->matches($rule, $request));
         self::assertSame($expected, $response->headers->has('X-Robots-Tag'));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function routerPaths(): iterable
+    {
+        yield 'plain' => ['/secrets/abc'];
+        yield 'encoded first byte (FF-M1)' => ['/%73ecrets/abc'];
+        yield 'encoded last byte' => ['/secret%73/abc'];
+        yield 'encoded separator' => ['/secrets%2Fabc'];
+        yield 'double-encoded (no route)' => ['/%2573ecrets/abc'];
+        yield 'other path' => ['/public/abc'];
+    }
+
+    /**
+     * A path_prefix rule applies exactly when the real router sends the request to the protected route.
+     */
+    #[DataProvider('routerPaths')]
+    public function testPathPrefixFollowsTheRouter(string $uri): void
+    {
+        $routes = new RouteCollection();
+        $routes->add('secret_show', new Route('/secrets/{id}'));
+        $routes->add('public_show', new Route('/public/{id}'));
+        $request = Request::create($uri);
+        try {
+            $request->attributes->add((new UrlMatcher($routes, new RequestContext()))->matchRequest($request));
+        } catch (ResourceNotFoundException) {
+        }
+        $response = new Response('<html></html>');
+        $response->headers->set('Content-Security-Policy', "default-src 'self'; frame-ancestors 'self'");
+
+        $this->dispatch([['path_prefix' => ['/secrets'], 'frame' => 'deny', 'no_store' => true]], $request, $response);
+
+        $protected = 'secret_show' === $request->attributes->get('_route');
+        self::assertSame($protected, 'DENY' === $response->headers->get('X-Frame-Options'));
+        self::assertSame($protected, "default-src 'self'; frame-ancestors 'none'" === $response->headers->get('Content-Security-Policy'));
+        self::assertSame($protected, 'no-store, private' === $response->headers->get('Cache-Control'));
+    }
+
+    public function testEncodedPathCannotSkipAPathPrefixRule(): void
+    {
+        $request = Request::create('/%73ecrets/abc');
+        $response = new Response('<html></html>');
+        $response->headers->set('Content-Security-Policy', "default-src 'self'; frame-ancestors 'self'");
+
+        $this->dispatch([['path_prefix' => ['/secrets'], 'frame' => 'deny', 'referrer' => 'no-referrer', 'robots' => 'noindex', 'no_store' => true]], $request, $response);
+
+        self::assertSame('/%73ecrets/abc', $request->getPathInfo());
+        self::assertSame('DENY', $response->headers->get('X-Frame-Options'));
+        self::assertSame("default-src 'self'; frame-ancestors 'none'", $response->headers->get('Content-Security-Policy'));
+        self::assertSame('no-referrer', $response->headers->get('Referrer-Policy'));
+        self::assertSame('noindex, nofollow', $response->headers->get('X-Robots-Tag'));
+        self::assertSame('no-store, private', $response->headers->get('Cache-Control'));
+    }
+
+    public function testFrameKeepsEveryPolicyValue(): void
+    {
+        $response = new Response();
+        $response->headers->set('Content-Security-Policy', "script-src 'self'; frame-ancestors 'self'");
+        $response->headers->set('Content-Security-Policy', "default-src 'none'", false);
+        $response->headers->set('Content-Security-Policy-Report-Only', "img-src 'self'");
+        $response->headers->set('Content-Security-Policy-Report-Only', "frame-ancestors *; style-src 'self'", false);
+
+        $this->dispatch([$this->rule(['frame' => 'deny'])], $this->secretRequest(), $response);
+
+        self::assertSame(
+            ["script-src 'self'; frame-ancestors 'none'", "default-src 'none'; frame-ancestors 'none'"],
+            $response->headers->all('Content-Security-Policy'),
+        );
+        self::assertSame(
+            ["img-src 'self'; frame-ancestors 'none'", "style-src 'self'; frame-ancestors 'none'"],
+            $response->headers->all('Content-Security-Policy-Report-Only'),
+        );
     }
 
     public function testSubRequestAndNoRulesAreIgnored(): void
@@ -197,6 +279,27 @@ final class RouteHeadersSubscriberTest extends TestCase
             RouteHeadersSubscriber::withFrameAncestors('frame-ancestors-x y', "'self'"),
             'Only the exact directive name is replaced.',
         );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function whitespaceSeparatedFrameAncestors(): iterable
+    {
+        yield 'tab' => ["default-src 'self'; frame-ancestors\thttps://evil.example"];
+        yield 'form feed' => ["default-src 'self'; frame-ancestors\fhttps://evil.example"];
+        yield 'line feed' => ["default-src 'self'; frame-ancestors\nhttps://evil.example"];
+        yield 'carriage return' => ["default-src 'self'; frame-ancestors\rhttps://evil.example"];
+        yield 'several spaces' => ["default-src 'self'; frame-ancestors   https://evil.example"];
+        yield 'upper case + tab' => ["default-src 'self'; FRAME-ANCESTORS\thttps://evil.example"];
+        yield 'mixed case + tabs' => ["default-src 'self';\tFrame-Ancestors\t\thttps://evil.example\t"];
+        yield 'name alone' => ["default-src 'self'; frame-ancestors"];
+    }
+
+    #[DataProvider('whitespaceSeparatedFrameAncestors')]
+    public function testFrameAncestorsWithAnyWhitespaceIsReplaced(string $policy): void
+    {
+        self::assertSame("default-src 'self'; frame-ancestors 'none'", RouteHeadersSubscriber::withFrameAncestors($policy, "'none'"));
     }
 
     /**
