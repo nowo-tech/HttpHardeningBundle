@@ -9,6 +9,7 @@ Root key: `nowo_http_hardening`.
 - [csp](#csp)
 - [public_cache](#public_cache)
 - [no_store](#no_store)
+- [route_headers](#route_headers)
 - [tenant_existence_mask](#tenant_existence_mask)
 - [trusted_hosts](#trusted_hosts)
 - [canonical_host](#canonical_host)
@@ -110,6 +111,28 @@ Signed-in users, responses that set cookies, non-200 responses and `no-store` ar
 | `routes` | `[]` | Exact route names (`_route` attribute) |
 
 On a matching **main** request `Cache-Control` is replaced with `no-store, private` and `ETag` / `Last-Modified` are removed. Sub-requests are ignored. It runs after the session listener (-1000), `anonymous_session_strip` (-1024) and `public_cache` (-1100), so `no-store` always wins.
+
+## route_headers
+
+Security headers per route (framing, referrer, robots, no-store). Empty by default; registers
+`RouteHeadersSubscriber` (`kernel.response` priority -1250) only when at least one rule is configured. Each entry:
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `match.route` | `[]` | Exact route names (string or list) |
+| `match.route_prefix` | `[]` | Route name prefixes, e.g. `secret_` (string or list) |
+| `match.path_prefix` | `[]` | Segment-aware path prefixes on `getPathInfo()` (`/secrets` matches `/secrets` and `/secrets/…`, not `/secretsauce`) |
+| `frame` | `null` | `deny`: `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`; `sameorigin`: `SAMEORIGIN` + `frame-ancestors 'self'` |
+| `referrer` | `null` | `Referrer-Policy` value (validated against the standard tokens) |
+| `robots` | `null` | `X-Robots-Tag` value; `noindex` is short for `noindex, nofollow` |
+| `no_store` | `false` | `Cache-Control: no-store, private`, no `ETag` / `Last-Modified` |
+
+A rule needs at least one `match` list and at least one header option; anything else fails the container build. A
+request matches when any of its lists matches. Matching rules apply in order (a later rule wins on the same header) on
+every response of the main request, errors and redirects included. `frame` replaces only the `frame-ancestors`
+directive of the policy already built (nonces and every other directive are kept), in `Content-Security-Policy` and,
+when present, `Content-Security-Policy-Report-Only`; without an enforced policy it adds `Content-Security-Policy:
+frame-ancestors '…'`.
 
 ## tenant_existence_mask
 

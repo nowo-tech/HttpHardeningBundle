@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Headers per route** (`route_headers`, opt-in, KIT-69 from the Beacon v1.122.0 audit): `RouteHeadersSubscriber`
+  (`kernel.response` priority -1250, after the CSP nonce listener, the Web Profiler toolbar and `no_store`) applies, on
+  every response of main requests matching `match.route` / `match.route_prefix` / `match.path_prefix` (errors and
+  redirects included): `frame: deny|sameorigin` (`X-Frame-Options` + CSP `frame-ancestors`, merged into the existing
+  policy and report-only policy without dropping other directives), `referrer` (`Referrer-Policy`), `robots`
+  (`X-Robots-Tag`, `noindex` = `noindex, nofollow`) and `no_store`. Rules are validated at container build. Registered
+  only when a rule is configured; existing defaults and behaviour are unchanged.
+
 ## [1.8.0] - 2026-10-31
 
 PerMinuteRateLimiter (runtime N-per-minute limit, hashed client IP) and opt-in rate_limit rules answering 429 with Retry-After. See [UPGRADING](UPGRADING.md#to-180).

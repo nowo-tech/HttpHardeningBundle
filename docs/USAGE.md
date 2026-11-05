@@ -12,6 +12,7 @@ After installation, security headers apply on every main response when `security
   - [Runtime sources](#runtime-sources)
 - [Public cache](#public-cache)
 - [No-store paths](#no-store-paths)
+- [Headers per route](#headers-per-route)
 - [Tenant existence mask](#tenant-existence-mask)
 - [Canonical host](#canonical-host)
 - [Bounded request body](#bounded-request-body)
@@ -138,7 +139,28 @@ nowo_http_hardening:
 
 `/settings/mailer` → `Cache-Control: no-store, private`, no `ETag`, no `Last-Modified`. `/administrator` and `/projects/abc` are left alone. Anchor patterns (`^`) and end them on `(?:/|$)` to avoid matching look-alike paths.
 
-Full `kernel.response` order: security headers (-80) → CSP (-100) → session listener (-1000) → strip (-1024) → public cache (-1100) → no-store (-1200). A route listed both in `public_cache` and `no_store` ends up `no-store`.
+Full `kernel.response` order: security headers (-80) → CSP (-100) → session listener (-1000) → strip (-1024) → public cache (-1100) → no-store (-1200) → route headers (-1250). A route listed both in `public_cache` and `no_store` ends up `no-store`.
+
+## Headers per route
+
+Pages that hold or lead to a secret (one-time links, device verification) need stricter headers than the rest of the
+app. Instead of a host subscriber that rewrites the CSP:
+
+```yaml
+nowo_http_hardening:
+    route_headers:
+        - match: { route_prefix: 'secret_' }      # or route: [...] / path_prefix: '/secrets'
+          frame: deny                             # CSP frame-ancestors 'none' + X-Frame-Options: DENY
+          referrer: no-referrer
+          robots: noindex                         # X-Robots-Tag: noindex, nofollow
+          no_store: true
+        - match: { route: [app_device_verify] }
+          frame: deny
+```
+
+`RouteHeadersSubscriber` runs at `kernel.response` priority -1250: after the CSP subscriber (-100), the Web Profiler
+toolbar nonces (-128) and no-store (-1200). Only `frame-ancestors` changes in the policy, so the nonce and the
+sources added by `CspSourceProviderInterface` stay. Error pages and redirects of a matching route get the same headers.
 
 ## Tenant existence mask
 

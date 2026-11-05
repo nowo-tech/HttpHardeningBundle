@@ -21,6 +21,10 @@
 
 ## Unreleased
 
+No breaking changes; the new `route_headers` list is empty by default. A host subscriber that rewrites
+`frame-ancestors` / `X-Frame-Options` / `Referrer-Policy` / `X-Robots-Tag` for some routes can be replaced by a
+`route_headers` entry (see [USAGE](USAGE.md#headers-per-route)).
+
 ## To 1.8.0
 
 From **1.7.2**:
