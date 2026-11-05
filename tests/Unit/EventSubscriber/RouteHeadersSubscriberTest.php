@@ -145,7 +145,7 @@ final class RouteHeadersSubscriberTest extends TestCase
         yield 'path prefix lookalike' => [['path_prefix' => ['/secrets']], '/secretsauce', null, false];
         yield 'percent-encoded path prefix' => [['path_prefix' => ['/secrets']], '/%73ecrets/abc', null, true];
         yield 'percent-encoded separator' => [['path_prefix' => ['/secrets']], '/secrets%2Fabc', null, true];
-        yield 'double-encoded path prefix' => [['path_prefix' => ['/secrets']], '/%2573ecrets/abc', null, false];
+        yield 'double-encoded path prefix' => [['path_prefix' => ['/secrets']], '/%2573ecrets/abc', null, false]; // ggignore: percent-encoded URL path, not a secret
         yield 'root path prefix' => [['path_prefix' => ['/']], '/anything', null, true];
         yield 'any of the lists' => [['route' => ['x'], 'route_prefix' => ['y_'], 'path_prefix' => ['/z']], '/z/1', 'other', true];
         yield 'empty rule' => [[], '/', 'home', false];
