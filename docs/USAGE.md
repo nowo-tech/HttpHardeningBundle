@@ -162,6 +162,11 @@ nowo_http_hardening:
 toolbar nonces (-128) and no-store (-1200). Only `frame-ancestors` changes in the policy, so the nonce and the
 sources added by `CspSourceProviderInterface` stay. Error pages and redirects of a matching route get the same headers.
 
+`path_prefix` compares the percent-decoded path the router matches, so `/%73ecrets/abc` (routed to `/secrets/{id}`)
+gets the headers of `/secrets`. A rule overrides the global values even when they are stricter (`frame: sameorigin`
+loosens a global `DENY`), so only set the values the route needs. Matching on `route` / `route_prefix` stays the most
+robust choice.
+
 ## Tenant existence mask
 
 Multi-tenant apps (projects, organisations, workspaces…) expose ids in URLs. If a stranger gets **403** on `/projects/<existing-id>/settings` but **404** on `/projects/<random-id>/settings`, the status code is an **existence oracle**: anyone signed in can enumerate which ids exist (and, with guessable ids, how many tenants you have or whether a known customer uses the product). The fix is to give a user with **no** access at all the same answer as an unknown id.

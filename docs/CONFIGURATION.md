@@ -107,7 +107,7 @@ Signed-in users, responses that set cookies, non-200 responses and `no-store` ar
 | Key | Default | Notes |
 |-----|---------|-------|
 | `enabled` | `false` | |
-| `path_patterns` | `[]` | PCRE patterns with delimiters, matched against `Request::getPathInfo()`, e.g. `'#^/admin(?:/\|$)#'`. Validated at container build: an invalid pattern throws `InvalidConfigurationException` |
+| `path_patterns` | `[]` | PCRE patterns with delimiters, e.g. `'#^/admin(?:/\|$)#'`, tried on the percent-decoded path the router matches (`rawurldecode(getPathInfo())`, so `/%61dmin` matches like `/admin`) and on the raw `getPathInfo()`. Validated at container build: an invalid pattern throws `InvalidConfigurationException` |
 | `routes` | `[]` | Exact route names (`_route` attribute) |
 
 On a matching **main** request `Cache-Control` is replaced with `no-store, private` and `ETag` / `Last-Modified` are removed. Sub-requests are ignored. It runs after the session listener (-1000), `anonymous_session_strip` (-1024) and `public_cache` (-1100), so `no-store` always wins.
@@ -121,7 +121,7 @@ Security headers per route (framing, referrer, robots, no-store). Empty by defau
 |-----|---------|-------|
 | `match.route` | `[]` | Exact route names (string or list) |
 | `match.route_prefix` | `[]` | Route name prefixes, e.g. `secret_` (string or list) |
-| `match.path_prefix` | `[]` | Segment-aware path prefixes on `getPathInfo()` (`/secrets` matches `/secrets` and `/secrets/…`, not `/secretsauce`) |
+| `match.path_prefix` | `[]` | Must start with `/`. Segment-aware prefixes of the percent-decoded path the router matches (`rawurldecode(getPathInfo())`, decoded once like `UrlMatcher`): `/secrets` matches `/secrets`, `/secrets/…`, `/%73ecrets/…` and `/secrets%2F…`, not `/secretsauce` |
 | `frame` | `null` | `deny`: `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`; `sameorigin`: `SAMEORIGIN` + `frame-ancestors 'self'` |
 | `referrer` | `null` | `Referrer-Policy` value (validated against the standard tokens) |
 | `robots` | `null` | `X-Robots-Tag` value; `noindex` is short for `noindex, nofollow` |
@@ -132,7 +132,15 @@ request matches when any of its lists matches. Matching rules apply in order (a 
 every response of the main request, errors and redirects included. `frame` replaces only the `frame-ancestors`
 directive of the policy already built (nonces and every other directive are kept), in `Content-Security-Policy` and,
 when present, `Content-Security-Policy-Report-Only`; without an enforced policy it adds `Content-Security-Policy:
-frame-ancestors '…'`.
+frame-ancestors '…'`. Every value of a repeated `Content-Security-Policy` (or Report-Only) header is rewritten and
+kept. The `frame-ancestors` directive is recognised whatever its case and whatever ASCII whitespace (space, tab, …)
+follows its name.
+
+A rule **replaces** the global or host value of each header it sets, even when the global one is stricter: `frame:
+sameorigin` over a global `X-Frame-Options: DENY` / `frame-ancestors 'none'`, `referrer: unsafe-url` over the default
+`strict-origin-when-cross-origin` or `robots: all` over a host `X-Robots-Tag: noindex` all loosen the route. Only
+`no_store: false` never undoes an earlier `no_store: true`. Rules are matched on the **main** request: a controller that
+`forward()`s to a protected route does not get that route's headers (match the forwarding route too).
 
 ## tenant_existence_mask
 

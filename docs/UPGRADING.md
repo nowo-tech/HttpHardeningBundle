@@ -25,6 +25,9 @@ No breaking changes; the new `route_headers` list is empty by default. A host su
 `frame-ancestors` / `X-Frame-Options` / `Referrer-Policy` / `X-Robots-Tag` for some routes can be replaced by a
 `route_headers` entry (see [USAGE](USAGE.md#headers-per-route)).
 
+`no_store.path_patterns` are now also tried on the percent-decoded path the router matches, so a percent-encoded URL
+of a protected page gets `no-store` too. Patterns that matched before still match; no change is needed.
+
 ## To 1.8.0
 
 From **1.7.2**:

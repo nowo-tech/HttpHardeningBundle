@@ -34,7 +34,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   redirects included): `frame: deny|sameorigin` (`X-Frame-Options` + CSP `frame-ancestors`, merged into the existing
   policy and report-only policy without dropping other directives), `referrer` (`Referrer-Policy`), `robots`
   (`X-Robots-Tag`, `noindex` = `noindex, nofollow`) and `no_store`. Rules are validated at container build. Registered
-  only when a rule is configured; existing defaults and behaviour are unchanged.
+  only when a rule is configured; existing defaults and behaviour are unchanged. `match.path_prefix` must start with `/`
+  (checked at container build) and is compared, segment-aware, with the percent-decoded path the router matches
+  (`rawurldecode(getPathInfo())`, decoded once like `UrlMatcher`), so `/%73ecrets/abc` cannot reach the `/secrets/{id}`
+  route without the rule's headers. `frame` rewrites every value of a repeated `Content-Security-Policy` /
+  Report-Only header, and recognises `frame-ancestors` whatever its case and the ASCII whitespace after its name (tab,
+  form feed…). A rule replaces the global / host value even when that one is stricter (documented).
+
+### Security
+
+- **`no_store.path_patterns` and percent-encoded paths:** the patterns were matched against the raw
+  `Request::getPathInfo()` while the router matches the decoded path, so `/%61dmin/keys` reached the `/admin/keys`
+  route without `Cache-Control: no-store`. Patterns are now tried on the decoded path the router matches (and still on
+  the raw path, so patterns written for encoded paths keep matching). New `Http\RouterPath::of()` helper.
 
 ## [1.8.0] - 2026-10-31
 
