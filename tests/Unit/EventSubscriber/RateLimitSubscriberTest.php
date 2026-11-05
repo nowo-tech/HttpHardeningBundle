@@ -219,6 +219,31 @@ final class RateLimitSubscriberTest extends TestCase
         self::assertSame($routed ? [null, null, null, 429] : [null, null, null, null], $codes);
     }
 
+    public function testGetRuleAlsoThrottlesHeadInTheSameBucket(): void
+    {
+        $subscriber = new RateLimitSubscriber($this->limiter(), ['feed' => $this->rule(['/feed'], [], ['GET'], 3)]);
+
+        self::assertSame('feed', $subscriber->matchingRule(Request::create('/feed', 'HEAD')));
+        self::assertSame('feed', $subscriber->matchingRule(Request::create('/%66eed', 'HEAD')));
+        self::assertNull($subscriber->matchingRule(Request::create('/feed', 'POST')));
+
+        $codes = [];
+        foreach (['HEAD', 'HEAD', 'HEAD', 'HEAD', 'GET'] as $method) {
+            $event = new RequestEvent($this->createStub(HttpKernelInterface::class), Request::create('/feed', $method, [], [], [], ['REMOTE_ADDR' => '192.0.2.10']), HttpKernelInterface::MAIN_REQUEST);
+            $subscriber($event);
+            $codes[] = $event->getResponse()?->getStatusCode();
+        }
+        self::assertSame([null, null, null, 429, 429], $codes, 'HEAD /feed gets a 429 after the limit, and shares the GET bucket.');
+    }
+
+    public function testHeadOnlyRuleDoesNotMatchGet(): void
+    {
+        $subscriber = new RateLimitSubscriber($this->limiter(), ['head' => $this->rule(['/feed'], [], ['HEAD'], 3)]);
+
+        self::assertSame('head', $subscriber->matchingRule(Request::create('/feed', 'HEAD')));
+        self::assertNull($subscriber->matchingRule(Request::create('/feed', 'GET')));
+    }
+
     public function testEncodedAndPlainSpellingsShareOneBucket(): void
     {
         $subscriber = new RateLimitSubscriber($this->limiter(), [

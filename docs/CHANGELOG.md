@@ -57,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/projects/%61bc…` (routed like `/projects/abc…`) answered the 403 instead of the masked 404, reopening the existence
   oracle. Patterns are now tried on the decoded path first (its capture is the tenant id the route receives), then on
   the raw path.
+- **`rate_limit` and `HEAD` (FF-L4, since 1.8.0):** a rule with `methods: [GET]` did not match `HEAD`, which the
+  router sends to the same `GET` controller, so `HEAD /feed` was never throttled. A rule listing `GET` now also
+  matches `HEAD`, in the same bucket.
 - **`route_headers` `frame` and unusual host policies (FF-I6):** a directive preceded by a form feed
   (`;\fframe-ancestors …`) and a comma-joined value (`default-src 'self', frame-ancestors …`) kept the host
   `frame-ancestors`. Directives are now trimmed of every ASCII whitespace, and each comma-separated policy of a value

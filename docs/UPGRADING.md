@@ -35,6 +35,9 @@ on the decoded path first, so an encoded tenant URL gets the masked 404; the ten
 that matched before still match; no change is needed. Review a `path_patterns` entry with a negative lookahead: an
 encoded spelling of the excluded path may now be throttled too (matching more only throttles more).
 
+A `rate_limit` rule whose `methods` list `GET` now also throttles `HEAD` requests (same bucket), like the router
+sends them to the `GET` controller. Listing `HEAD` explicitly is no longer needed; nothing else changes.
+
 `route_headers[].robots` must not contain any control character (tab, NUL, DEL… as well as CR / LF): such a value now
 fails the container build. A `frame` rule now also rewrites each policy of a comma-joined `Content-Security-Policy`
 value.

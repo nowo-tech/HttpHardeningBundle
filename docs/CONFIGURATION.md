@@ -214,11 +214,13 @@ Per-client-IP "N per minute" sliding-window limit on configured paths. Off by de
 | `priority` | `32` | `kernel.request` priority; keep it above the firewall (8) so throttled requests never reach credential lookups |
 | `rules.<name>.path_prefixes` | `[]` | Must start with `/`. Segment-aware: `/hooks/slack` matches `/hooks/slack` and `/hooks/slack/x`, not `/hooks/slackware`; a trailing `/` makes it a plain prefix. Compared with the percent-decoded path the router matches and with the raw `getPathInfo()` (either applies the rule), so `/%68ooks/slack` is throttled too, in the same bucket |
 | `rules.<name>.path_patterns` | `[]` | PCRE patterns with delimiters, tried on the percent-decoded path the router matches and on the raw `getPathInfo()`; invalid patterns fail the container build |
-| `rules.<name>.methods` | `[]` | HTTP methods (upper-cased); empty means every method |
+| `rules.<name>.methods` | `[]` | HTTP methods (upper-cased); empty means every method. `GET` also matches `HEAD` (the router sends `HEAD` to the `GET` controller) |
 | `rules.<name>.limit_per_minute` | `60` | Requests per client IP and sliding minute; `0` disables the rule |
 | `rules.<name>.limit_provider` | `null` | Service id implementing `Nowo\HttpHardeningBundle\RateLimit\RateLimitProviderInterface`; its value (read on every matching request) replaces `limit_per_minute` |
 
 Each rule needs at least one `path_prefixes` or `path_patterns` entry; rule names use letters, digits, `_`, `.` and `-` (the name separates the buckets: limiter id `nowo_http_hardening_<name>`). The first rule whose method and path match a **main** request applies. The bucket key is `PerMinuteRateLimiter::ipKey(Request::getClientIp())` (an `xxh128` hash; configure `framework.trusted_proxies` behind a proxy). Over the limit the request gets a `429` JSON response `{"message":"rate limit exceeded"}` with `Retry-After` (seconds until a token is free, between 1 and 60) and `Cache-Control: no-store, private`; the controller never runs.
+
+`path_patterns` with the `u` modifier (here, in `no_store` and in `tenant_existence_mask`) never match a path whose decoded form is invalid UTF-8 (`preg_match` fails). The router only dispatches such a path to a route compiled **without** `utf8`, so keep the FrameworkBundle default `framework.router.utf8: true`, or leave the `u` modifier off these patterns.
 
 ```yaml
 nowo_http_hardening:

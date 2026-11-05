@@ -28,7 +28,8 @@ use function strtoupper;
  *
  * Each rule matches the request path by path prefix (segment-aware: `/hooks/slack` matches `/hooks/slack` and
  * `/hooks/slack/x`, not `/hooks/slackware`; a prefix ending with `/` is a plain prefix) or PCRE pattern, and
- * optionally by HTTP method. The first matching rule wins. Prefixes and patterns are tried on the percent-decoded
+ * optionally by HTTP method (a rule listing `GET` also matches `HEAD`, which the router sends to the `GET`
+ * controller). The first matching rule wins. Prefixes and patterns are tried on the percent-decoded
  * path the router matches ({@see RouterPath::of()}) and, when it differs, on the raw `Request::getPathInfo()`: a
  * match on either applies the rule, so `/%6Cogin` (routed to `/login`) cannot skip the throttle of `/login`. Its limit is the configured `limit_per_minute`, or the
  * value of its {@see RateLimitProviderInterface} read on each request (runtime settings); `0` disables the rule.
@@ -102,7 +103,7 @@ final readonly class RateLimitSubscriber
         $method = strtoupper($request->getMethod());
 
         foreach ($this->rules as $name => $rule) {
-            if ([] !== $rule['methods'] && !in_array($method, $rule['methods'], true)) {
+            if (!$this->methodMatches($method, $rule['methods'])) {
                 continue;
             }
             // Matching more only throttles more: the decoded path follows the router, the raw one keeps rules
@@ -113,6 +114,19 @@ final readonly class RateLimitSubscriber
         }
 
         return null;
+    }
+
+    /**
+     * An empty list matches every method. A list with `GET` also matches `HEAD`, like the router, which sends a
+     * `HEAD` request to the `GET` controller (same rule, same bucket).
+     *
+     * @param list<string> $methods upper-cased
+     */
+    private function methodMatches(string $method, array $methods): bool
+    {
+        return [] === $methods
+            || in_array($method, $methods, true)
+            || ('HEAD' === $method && in_array('GET', $methods, true));
     }
 
     /**
