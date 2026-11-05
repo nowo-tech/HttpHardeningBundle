@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.9.0](#to-190)
 - [To 1.8.0](#to-180)
 - [To 1.7.2](#to-172)
 - [To 1.7.1](#to-171)
@@ -20,6 +21,14 @@
 - [First install](#first-install)
 
 ## Unreleased
+
+## To 1.9.0
+
+From **1.8.0**:
+
+```bash
+composer update nowo-tech/http-hardening-bundle
+```
 
 No breaking changes; the new `route_headers` list is empty by default. A host subscriber that rewrites
 `frame-ancestors` / `X-Frame-Options` / `Referrer-Policy` / `X-Robots-Tag` for some routes can be replaced by a
