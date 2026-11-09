@@ -23,6 +23,8 @@ After installation, security headers apply on every main response when `security
   - [Path rules (429)](#path-rules-429)
   - [Runtime limits](#runtime-limits)
   - [Limiter service](#limiter-service)
+- [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
+  - [Known limitations](#known-limitations)
 
 ## Security headers
 
@@ -345,3 +347,46 @@ $state = $this->limiter->consume('webhook_ip', PerMinuteRateLimiter::ipKey($requ
 ```
 
 `$id` separates the buckets of each guard, `$key` is the bucket inside it; `ipKey()` hashes the client IP (`ip_<xxh128>`, `unknown` when empty) so raw addresses never reach the cache keys. A limit of `0` or less disables the check. Without a lock two concurrent requests may both pass on the last token: fine for abuse throttling, not for billing quotas.
+
+## Using it from a DDD / hexagonal application
+
+HttpHardeningBundle is an HTTP edge adapter (headers, CSP, caching rules, tenant masking, rate limiting). It has no
+entities and no Doctrine code, and it never sees your domain model. Everything is driven by configuration plus three
+small ports that you implement in your infrastructure layer:
+
+| Port | Use it to |
+|------|-----------|
+| `Security\TenantAccessCheckerInterface::hasAnyAccess(UserInterface, string $tenantId)` | answer "may this user know tenant X exists?" for `tenant_existence_mask` |
+| `RateLimit\RateLimitProviderInterface::limitPerMinute(string $rule, Request)` | read a runtime limit (settings, plan quota) for a `rate_limit` rule |
+| `Csp\CspSourceProviderInterface::getSources(Request)` | add CSP sources known only at runtime (e.g. a CDN origin from settings) |
+
+Keep the adapters thin and delegate to an application query:
+
+```php
+final readonly class MembershipTenantAccessChecker implements TenantAccessCheckerInterface
+{
+    public function __construct(private TenantMembershipQuery $memberships) {} // your application port
+
+    public function hasAnyAccess(UserInterface $user, string $tenantId): bool
+    {
+        return $this->memberships->userHasAnyRole($user->getUserIdentifier(), strtolower($tenantId));
+    }
+}
+```
+
+```yaml
+nowo_http_hardening:
+    tenant_existence_mask:
+        enabled: true
+        path_patterns: ['#^/t/(?<tenant>[^/]+)/#']
+        access_checker: App\Infrastructure\Security\MembershipTenantAccessChecker
+```
+
+- Implementations must be stateless (FrankenPHP worker mode) and cheap: they run on matching requests.
+- In application code, prefer your own port over calling `PerMinuteRateLimiter` directly; implement the port with it.
+
+### Known limitations
+
+- No events are dispatched for rate-limited requests or masked tenant denials; decorate the subscribers if you
+  need to audit them.
+- `PerMinuteRateLimiter` has no interface.
