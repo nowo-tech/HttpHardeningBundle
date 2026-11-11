@@ -111,7 +111,9 @@ With autoconfiguration on, the class is tagged automatically.
 `CspSourceContributorInterface` (1.10.0) is autoconfigured (tag `nowo_http_hardening.csp_source_contributor`) and
 receives a framework-free `HttpRequestInfo` (method, scheme, host, port, raw and decoded path, client IP, route name
 and scalar route parameters). The older `CspSourceProviderInterface::getSources(Request)` still works and is
-deprecated (removed in 2.0); a service implementing both is asked once, through the new port.
+deprecated (removed in 2.0); a service implementing both is asked once, through the new port (its sources come
+after the legacy-only providers'). A runtime source with whitespace, `;`, `,` or a control character is skipped:
+return one CSP token per list entry.
 
 ## Public cache
 
@@ -214,8 +216,9 @@ deprecated (removed in 2.0). With `access_checker` unset, the bundle uses the `T
 it exists, else the `TenantAccessCheckerInterface` alias; with neither, the container build fails (the mask never
 guesses). A class implementing both is called through the new port only.
 
-After each masked denial a `Event\TenantExistenceMaskedEvent` (tenant id, decoded path, user identifier) is
-dispatched, for security logs.
+After each masked denial a `Event\TenantExistenceMaskedEvent` (tenant id, decoded path, user identifier, route name) is
+dispatched, for security logs. The user identifier is **personal data** and the path may carry secrets (a token in a
+URL segment): prefer the route name in logs, or treat both as sensitive.
 
 | Who | Before | After |
 | --- | --- | --- |
@@ -350,8 +353,10 @@ nowo_http_hardening:
 
 The provider runs on every matching request: keep it cheap (cached settings) and stateless. It receives a
 framework-free `HttpRequestInfo`; the older `RateLimitProviderInterface::limitPerMinute(string, Request)` still works
-and is deprecated (removed in 2.0). Each 429 dispatches an `Event\RateLimitExceededEvent` (rule, hashed client key,
-limit, decoded path, `Retry-After` seconds; never the raw IP).
+and is deprecated (removed in 2.0). Each 429 dispatches an `Event\RateLimitExceededEvent` (rule, client key, limit,
+decoded path, `Retry-After` seconds, route name when known; never the raw IP). The client key is an HMAC-SHA256 of
+the client IP keyed with `kernel.secret` (`ip_unkeyed` without one); it still identifies a client, and the path may
+carry secrets, so treat both as sensitive in logs.
 
 ### Limiter service
 

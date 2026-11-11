@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\HttpHardeningBundle;
 
 use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\LegacyPortDeprecationPass;
+use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\RateLimitEventKeyPass;
 use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\TenantAccessCheckerPass;
 use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\WebProfilerCspHandlerPass;
 use Nowo\HttpHardeningBundle\DependencyInjection\NowoHttpHardeningExtension;
@@ -27,6 +28,7 @@ class NowoHttpHardeningBundle extends Bundle
         $container->addCompilerPass(new WebProfilerCspHandlerPass());
         $container->addCompilerPass(new TenantAccessCheckerPass());
         $container->addCompilerPass(new LegacyPortDeprecationPass());
+        $container->addCompilerPass(new RateLimitEventKeyPass());
     }
 
     public function getContainerExtension(): ?ExtensionInterface

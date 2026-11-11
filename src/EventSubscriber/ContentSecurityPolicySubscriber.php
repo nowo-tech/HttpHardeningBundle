@@ -72,6 +72,12 @@ final readonly class ContentSecurityPolicySubscriber
 
     private const NONCE_DIRECTIVES = ['script-src', 'style-src-elem'];
 
+    /** A source that would end the directive / policy or break the header line (every source). */
+    private const UNSAFE_SOURCE = '/[;,\x00-\x1f\x7f]/';
+
+    /** A runtime (provider / contributor) source must also be a single token: no whitespace at all. */
+    private const UNSAFE_RUNTIME_SOURCE = '/[\s;,\x00-\x1f\x7f]/';
+
     private const DEBUG_SOURCES = [
         'style-src-elem' => ["'unsafe-inline'"],
         'script-src' => ["'unsafe-eval'"],
@@ -203,7 +209,12 @@ final readonly class ContentSecurityPolicySubscriber
                     continue;
                 }
                 foreach ($list as $source) {
-                    $sources[$directive][] = $source;
+                    // MJ-H-L1: one runtime source is one CSP token. Whitespace, `;`, `,` or a control character
+                    // would add a directive, a source or a policy (or drop the header): skip the source.
+                    $source = trim($source);
+                    if (1 !== preg_match(self::UNSAFE_RUNTIME_SOURCE, $source)) {
+                        $sources[$directive][] = $source;
+                    }
                 }
             }
         }
@@ -213,7 +224,9 @@ final readonly class ContentSecurityPolicySubscriber
             $clean = [];
             foreach ($list as $source) {
                 $source = trim($source);
-                if ('' !== $source && !in_array($source, $clean, true)) {
+                // Configured sources too: never a `;` / `,` / control character (a space inside a configured entry
+                // only separates two sources and is kept for BC).
+                if ('' !== $source && 1 !== preg_match(self::UNSAFE_SOURCE, $source) && !in_array($source, $clean, true)) {
                     $clean[] = $source;
                 }
             }

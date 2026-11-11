@@ -13,6 +13,7 @@ use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiter;
 use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiterInterface;
 use Nowo\HttpHardeningBundle\RateLimit\RateLimitProviderInterface;
 use Nowo\HttpHardeningBundle\RateLimit\RuleLimitProviderInterface;
+use SensitiveParameter;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,6 +22,7 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 use function ceil;
 use function in_array;
+use function is_string;
 use function max;
 use function microtime;
 use function min;
@@ -60,6 +62,9 @@ final readonly class RateLimitSubscriber
 
     public const RESPONSE_BODY = ['message' => 'rate limit exceeded'];
 
+    /** {@see RateLimitExceededEvent::$clientKey} when no `kernel.secret` is available. */
+    public const UNKEYED_CLIENT_KEY = 'ip_unkeyed';
+
     /**
      * @param array<string, array{path_prefixes: list<string>, path_patterns: list<string>, methods: list<string>, limit_per_minute: int}> $rules
      * @param array<string, RateLimitProviderInterface|RuleLimitProviderInterface>                                                         $limitProviders runtime limit per rule name
@@ -69,6 +74,8 @@ final readonly class RateLimitSubscriber
         private array $rules,
         private array $limitProviders = [],
         private ?EventDispatcherInterface $eventDispatcher = null,
+        #[SensitiveParameter]
+        private string $eventKeySecret = '',
     ) {
     }
 
@@ -85,9 +92,9 @@ final readonly class RateLimitSubscriber
         }
 
         $limit = $this->limitFor($rule, $request);
-        $clientKey = PerMinuteRateLimiter::ipKey($request->getClientIp() ?? '');
+        $bucketKey = PerMinuteRateLimiter::ipKey($request->getClientIp() ?? '');
 
-        $decision = $this->limiter->attempt(self::LIMITER_ID_PREFIX.$rule, $clientKey, $limit);
+        $decision = $this->limiter->attempt(self::LIMITER_ID_PREFIX.$rule, $bucketKey, $limit);
         if (!$decision instanceof RateLimitDecision || $decision->accepted) {
             return;
         }
@@ -101,7 +108,31 @@ final readonly class RateLimitSubscriber
             'Cache-Control' => 'no-store, private',
         ]));
 
-        $this->eventDispatcher?->dispatch(new RateLimitExceededEvent($rule, $clientKey, $limit, RouterPath::of($request), $retryAfter));
+        if ($this->eventDispatcher instanceof EventDispatcherInterface) {
+            $route = $request->attributes->get('_route');
+            $this->eventDispatcher->dispatch(new RateLimitExceededEvent(
+                $rule,
+                $this->eventClientKey($request->getClientIp() ?? ''),
+                $limit,
+                RouterPath::of($request),
+                $retryAfter,
+                is_string($route) ? $route : null,
+            ));
+        }
+    }
+
+    /**
+     * MJ-H-L2: the event key is an HMAC of the client IP keyed with `kernel.secret` (an unkeyed hash of an IPv4
+     * address is reversible by enumeration). The cache bucket key ({@see PerMinuteRateLimiter::ipKey()}) is unchanged,
+     * so existing buckets survive the upgrade.
+     */
+    public function eventClientKey(string $clientIp): string
+    {
+        if ('' === $this->eventKeySecret) {
+            return self::UNKEYED_CLIENT_KEY;
+        }
+
+        return 'ip_'.substr(hash_hmac('sha256', '' !== $clientIp ? $clientIp : 'unknown', $this->eventKeySecret), 0, 32);
     }
 
     /**

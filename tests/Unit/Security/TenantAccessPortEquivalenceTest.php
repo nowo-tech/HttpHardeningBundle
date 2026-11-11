@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle\Tests\Unit\Security;
 
+use ArrayObject;
 use Nowo\HttpHardeningBundle\Event\TenantExistenceMaskedEvent;
 use Nowo\HttpHardeningBundle\EventSubscriber\TenantExistenceMaskSubscriber;
 use Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface;
@@ -107,15 +108,24 @@ final class TenantAccessPortEquivalenceTest extends TestCase
     public function testMaskedDenialDispatchesAnEventWithScalarsOnly(): void
     {
         $dispatcher = new EventDispatcher();
-        $seen = [];
-        $dispatcher->addListener(TenantExistenceMaskedEvent::class, static function (TenantExistenceMaskedEvent $e) use (&$seen): void {
-            $seen[] = [$e->tenantId, $e->path, $e->userIdentifier];
+        /** @var ArrayObject<int, array{string, string, string, string|null}> $seen */
+        $seen = new ArrayObject();
+        $dispatcher->addListener(TenantExistenceMaskedEvent::class, static function (TenantExistenceMaskedEvent $e) use ($seen): void {
+            $seen->append([$e->tenantId, $e->path, $e->userIdentifier, $e->routeName]);
         });
 
         $this->dispatch(new MapTenantAccessQuery(['member' => ['abcd']]), '/projects/%61bcd/x', 'stranger', ['ROLE_USER'], new AccessDeniedException(), $dispatcher);
         $this->dispatch(new MapTenantAccessQuery(['member' => ['abcd']]), '/projects/abcd', 'member', ['ROLE_USER'], new AccessDeniedException(), $dispatcher);
 
-        self::assertSame([['abcd', '/projects/abcd/x', 'stranger']], $seen, 'Only the masked denial is reported.');
+        self::assertSame([['abcd', '/projects/abcd/x', 'stranger', null]], $seen->getArrayCopy(), 'Only the masked denial is reported.');
+
+        $request = Request::create('/projects/abcd/settings');
+        $request->attributes->set('_route', 'project_settings');
+        $tokenStorage = new TokenStorage();
+        $tokenStorage->setToken(new UsernamePasswordToken(new InMemoryUser('stranger', null, ['ROLE_USER']), 'main', ['ROLE_USER']));
+        $event = new ExceptionEvent($this->createStub(HttpKernelInterface::class), $request, HttpKernelInterface::MAIN_REQUEST, new AccessDeniedException());
+        (new TenantExistenceMaskSubscriber($tokenStorage, new MapTenantAccessQuery([]), self::PATTERNS, $dispatcher))->onException($event);
+        self::assertSame(['abcd', '/projects/abcd/settings', 'stranger', 'project_settings'], $seen[1]);
     }
 
     /**

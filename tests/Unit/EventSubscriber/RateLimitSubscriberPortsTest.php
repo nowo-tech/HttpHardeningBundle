@@ -85,6 +85,7 @@ final class RateLimitSubscriberPortsTest extends TestCase
             ['hooks' => ['path_prefixes' => ['/hooks'], 'path_patterns' => [], 'methods' => [], 'limit_per_minute' => 1]],
             [],
             $dispatcher,
+            'REDACTED-TEST-x',
         );
 
         $subscriber($this->event('/hooks/%61', '198.51.100.7'));
@@ -96,7 +97,10 @@ final class RateLimitSubscriberPortsTest extends TestCase
         $exceeded = $seen[0];
         self::assertInstanceOf(RateLimitExceededEvent::class, $exceeded);
         self::assertSame('hooks', $exceeded->rule);
-        self::assertSame(PerMinuteRateLimiter::ipKey('198.51.100.7'), $exceeded->clientKey);
+        self::assertSame($subscriber->eventClientKey('198.51.100.7'), $exceeded->clientKey);
+        self::assertNotSame(PerMinuteRateLimiter::ipKey('198.51.100.7'), $exceeded->clientKey, 'Not the unkeyed bucket hash.');
+        self::assertMatchesRegularExpression('/^ip_[0-9a-f]{32}$/', $exceeded->clientKey);
+        self::assertNull($exceeded->routeName, 'The rule runs before routing.');
         self::assertStringNotContainsString('198.51.100.7', $exceeded->clientKey);
         self::assertSame(1, $exceeded->limitPerMinute);
         self::assertSame('/hooks/a', $exceeded->path);
@@ -119,5 +123,42 @@ final class RateLimitSubscriberPortsTest extends TestCase
             Request::create($path, 'GET', [], [], [], ['REMOTE_ADDR' => $ip]),
             HttpKernelInterface::MAIN_REQUEST,
         );
+    }
+
+    public function testEventClientKeyIsKeyedWithTheSecret(): void
+    {
+        $rules = ['hooks' => ['path_prefixes' => ['/hooks'], 'path_patterns' => [], 'methods' => [], 'limit_per_minute' => 1]];
+        $limiter = new PerMinuteRateLimiter(new ArrayAdapter());
+        $a = new RateLimitSubscriber($limiter, $rules, [], null, 'REDACTED-TEST-a');
+        $b = new RateLimitSubscriber($limiter, $rules, [], null, 'REDACTED-TEST-b');
+
+        self::assertSame($a->eventClientKey('203.0.113.1'), $a->eventClientKey('203.0.113.1'), 'Stable per client.');
+        self::assertNotSame($a->eventClientKey('203.0.113.1'), $a->eventClientKey('203.0.113.2'));
+        self::assertNotSame($a->eventClientKey('203.0.113.1'), $b->eventClientKey('203.0.113.1'), 'Depends on the secret.');
+        self::assertSame($a->eventClientKey('unknown'), $a->eventClientKey(''));
+        self::assertSame(RateLimitSubscriber::UNKEYED_CLIENT_KEY, (new RateLimitSubscriber($limiter, $rules))->eventClientKey('203.0.113.1'));
+    }
+
+    public function testEventCarriesTheRouteNameWhenKnown(): void
+    {
+        $dispatcher = new EventDispatcher();
+        /** @var ArrayObject<int, string|null> $routes */
+        $routes = new ArrayObject();
+        $dispatcher->addListener(RateLimitExceededEvent::class, static function (RateLimitExceededEvent $e) use ($routes): void {
+            $routes->append($e->routeName);
+        });
+        $subscriber = new RateLimitSubscriber(
+            new PerMinuteRateLimiter(new ArrayAdapter()),
+            ['hooks' => ['path_prefixes' => ['/hooks'], 'path_patterns' => [], 'methods' => [], 'limit_per_minute' => 1]],
+            [],
+            $dispatcher,
+        );
+        for ($i = 0; $i < 2; ++$i) {
+            $event = $this->event('/hooks/a');
+            $event->getRequest()->attributes->set('_route', 'hook');
+            $subscriber($event);
+        }
+
+        self::assertSame(['hook'], $routes->getArrayCopy());
     }
 }

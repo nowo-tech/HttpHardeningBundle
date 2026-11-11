@@ -6,6 +6,7 @@ namespace Nowo\HttpHardeningBundle\Tests\Unit\DependencyInjection\Compiler;
 
 use Nowo\HttpHardeningBundle\Csp\CspSourceProviderInterface;
 use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\LegacyPortDeprecationPass;
+use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\RateLimitEventKeyPass;
 use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\TenantAccessCheckerPass;
 use Nowo\HttpHardeningBundle\DependencyInjection\NowoHttpHardeningExtension;
 use Nowo\HttpHardeningBundle\EventSubscriber\RateLimitSubscriber;
@@ -138,6 +139,22 @@ final class ArchitecturePortsPassTest extends TestCase
         self::assertSame([], $this->deprecations(static fn () => (new LegacyPortDeprecationPass())->process(new ContainerBuilder())));
     }
 
+    public function testRateLimitEventKeyUsesTheKernelSecretWhenPresent(): void
+    {
+        $config = ['rate_limit' => ['enabled' => true, 'rules' => ['r' => ['path_prefixes' => ['/r']]]]];
+
+        $without = $this->container($config);
+        (new RateLimitEventKeyPass())->process($without);
+        self::assertArrayNotHasKey('$eventKeySecret', $without->getDefinition(RateLimitSubscriber::class)->getArguments());
+
+        $with = $this->container($config);
+        $with->setParameter('kernel.secret', 'REDACTED-TEST-x');
+        (new RateLimitEventKeyPass())->process($with);
+        self::assertSame('%kernel.secret%', $with->getDefinition(RateLimitSubscriber::class)->getArgument('$eventKeySecret'));
+
+        (new RateLimitEventKeyPass())->process(new ContainerBuilder());
+    }
+
     public function testBundleRegistersThePasses(): void
     {
         $container = new ContainerBuilder();
@@ -146,6 +163,7 @@ final class ArchitecturePortsPassTest extends TestCase
 
         self::assertContains(TenantAccessCheckerPass::class, $classes);
         self::assertContains(LegacyPortDeprecationPass::class, $classes);
+        self::assertContains(RateLimitEventKeyPass::class, $classes);
     }
 
     /**

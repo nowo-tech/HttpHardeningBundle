@@ -88,7 +88,8 @@ final readonly class TenantExistenceMaskSubscriber
         // back into a 403.
         $event->setThrowable(new NotFoundHttpException());
 
-        $this->eventDispatcher?->dispatch(new TenantExistenceMaskedEvent($tenantId, $routerPath, $user->getUserIdentifier()));
+        $route = $request->attributes->get('_route');
+        $this->eventDispatcher?->dispatch(new TenantExistenceMaskedEvent($tenantId, $routerPath, $user->getUserIdentifier(), is_string($route) ? $route : null));
     }
 
     /**
