@@ -27,9 +27,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Target: **1.10.0** (minor, no breaking change). See [UPGRADING](UPGRADING.md#unreleased).
+
+### Added
+
+- **Framework-free ports (REQ-ARCH-001 rule 3):** `Security\TenantAccessQueryInterface::hasAnyAccess(UserRef, string)`,
+  `RateLimit\RuleLimitProviderInterface::limitPerMinute(string, HttpRequestInfo)` and
+  `Csp\CspSourceContributorInterface::getSources(HttpRequestInfo)` (autoconfigured, tag
+  `nowo_http_hardening.csp_source_contributor`), with the bundle-owned value objects `Model\UserRef` (user identifier +
+  own roles) and `Model\HttpRequestInfo` (method, scheme, host, port, raw and decoded path, client IP, route name,
+  scalar route parameters), built by `Http\HttpRequestInfoFactory`. When a service implements both the old and the new
+  port, the new one is called (once).
+- **Interfaces for the services (rule 1):** `RateLimit\PerMinuteRateLimiterInterface` (`accept()`, new `attempt()`
+  returning a framework-free `Model\RateLimitDecision`) and `Http\SafeInternalRedirectInterface`
+  (`resolveForCurrentRequest()`, new `resolveForOrigin()`), both aliased to the existing services.
+  `SafeInternalRedirect::resolve()`, `resolveForCurrentRequest()` and `resolveForOrigin()` share one validation.
+- **CSP source order:** sources of services on the deprecated `CspSourceProviderInterface` come first, then those of
+  `CspSourceContributorInterface` services. A service implementing **both** ports is asked once, through the new
+  port, so its sources now come after the legacy-only providers' (the policy has the same sources; only the order in
+  the header can change).
+- **Security events (rule 4):** `Event\TenantExistenceMaskedEvent` (tenant id, decoded path, user identifier, route
+  name) after a masked denial and `Event\RateLimitExceededEvent` (rule, client key, limit, decoded path, `Retry-After`,
+  route name when known) after a 429; scalars only, dispatched when an event dispatcher is wired. The client key is an
+  HMAC-SHA256 of the client IP keyed with `kernel.secret` (`ip_unkeyed` without a secret), not the reversible cache
+  bucket hash; the bucket key is unchanged, so existing buckets survive the upgrade. `userIdentifier` is personal
+  data and `path` may carry secrets (a token in a URL segment): log the route name, or treat both as sensitive.
+- `tenant_existence_mask.access_checker` unset now resolves to the `TenantAccessQueryInterface` alias when the host
+  registered one, else to the `TenantAccessCheckerInterface` alias (unchanged); with neither the container build still
+  fails.
+- Tests: old-vs-new port equivalence (tenant decision matrix, rate-limit throttling, CSP policy, open-redirect corpus)
+  and a DDD-host kernel wired only with the new ports that answers like the standard host.
+
+### Security
+
+- **CSP sources are validated (audit MJ-H-L1).** A source from a `CspSourceProviderInterface` /
+  `CspSourceContributorInterface` service containing whitespace, `;`, `,` or a control character is skipped: it
+  could add a directive (`https://x; script-src 'unsafe-inline'`), a source or a second policy, or drop the whole
+  header (CR / LF). Configured sources containing `;`, `,` or a control character are skipped too (a space in a
+  configured entry still separates two sources).
+
+### Deprecated
+
+- `Security\TenantAccessCheckerInterface`, `RateLimit\RateLimitProviderInterface` and
+  `Csp\CspSourceProviderInterface` (they take Symfony `UserInterface` / `Request`): use the framework-free ports above.
+  They keep working until 2.0; the container build reports a deprecation for each host service that implements one
+  without its replacement.
+
 ### Changed
 
-- Docs: new USAGE section "Using it from a DDD / hexagonal application" (where the bundle sits in a hexagonal host, the ports, events and DTOs to build an anti-corruption layer on, and the known limitations).
+- Docs: USAGE section "Standard host and DDD host" (replaces "Using it from a DDD / hexagonal application"): both host
+  paths, the framework-free ports, value objects and events.
+- `composer.json` requires `symfony/deprecation-contracts` and `symfony/event-dispatcher-contracts` explicitly (both were
+  already installed through `symfony/http-kernel`).
+- `RateLimitSubscriber` depends on `PerMinuteRateLimiterInterface` (the service id `PerMinuteRateLimiter` is
+  unchanged), `SafeUrlExtension` on `SafeInternalRedirectInterface`.
 
 ## [1.9.0] - 2026-11-05
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle\Security;
 
+use Nowo\HttpHardeningBundle\Model\UserRef;
 use Symfony\Component\Security\Core\User\UserInterface;
 
 /**
@@ -16,6 +17,8 @@ use Symfony\Component\Security\Core\User\UserInterface;
  *
  * Return `false` for an unknown or malformed id too. Implementations must be stateless (FrankenPHP worker mode):
  * no per-request memoisation in properties.
+ *
+ * @deprecated since 1.10.0, implement {@see TenantAccessQueryInterface} (takes a framework-free {@see UserRef}); removed in 2.0
  *
  * @author Héctor Franco Aceituno <hectorfranco@nowo.tech>
  * @copyright 2026 Nowo.tech

@@ -7,6 +7,7 @@ namespace Nowo\HttpHardeningBundle\Http;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 
+use function rtrim;
 use function strlen;
 
 /**
@@ -16,7 +17,7 @@ use function strlen;
  * @author Héctor Franco Aceituno <hectorfranco@nowo.tech>
  * @copyright 2026 Nowo.tech
  */
-final readonly class SafeInternalRedirect
+final readonly class SafeInternalRedirect implements SafeInternalRedirectInterface
 {
     public function __construct(
         private ?RequestStack $requestStack = null,
@@ -31,12 +32,24 @@ final readonly class SafeInternalRedirect
      */
     public static function resolve(Request $request, string $target, string $fallback): string
     {
+        return self::sanitize($request->getSchemeAndHttpHost(), $target, $fallback);
+    }
+
+    public function resolveForOrigin(string $schemeAndHttpHost, string $target, string $fallback = '/'): string
+    {
+        return self::sanitize(rtrim($schemeAndHttpHost, '/'), $target, $fallback);
+    }
+
+    /**
+     * The single validation both entry points share (same rules for the Request and the origin forms).
+     */
+    private static function sanitize(string $host, string $target, string $fallback): string
+    {
         $target = trim($target);
         if ('' === $target || 1 === preg_match('/[\x00-\x1f\x7f]/', $target)) {
             return $fallback;
         }
 
-        $host = $request->getSchemeAndHttpHost();
         if (str_starts_with($target, $host.'/')) {
             $target = substr($target, strlen($host));
         }

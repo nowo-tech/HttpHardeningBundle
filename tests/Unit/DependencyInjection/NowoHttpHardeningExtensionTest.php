@@ -19,6 +19,7 @@ use Nowo\HttpHardeningBundle\EventSubscriber\SecurityHeadersSubscriber;
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
 use Nowo\HttpHardeningBundle\Http\TrustedHostsEnvVarProcessor;
 use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiter;
+use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiterInterface;
 use Nowo\HttpHardeningBundle\Twig\CspNonceExtension;
 use Nowo\HttpHardeningBundle\Twig\SafeUrlExtension;
 use PHPUnit\Framework\TestCase;
@@ -227,7 +228,8 @@ final class NowoHttpHardeningExtensionTest extends TestCase
 
         self::assertEquals(new Reference('cache.rate_limiter'), $container->getDefinition(PerMinuteRateLimiter::class)->getArgument('$cache'));
         $definition = $container->getDefinition(RateLimitSubscriber::class);
-        self::assertEquals(new Reference(PerMinuteRateLimiter::class), $definition->getArgument('$limiter'));
+        self::assertEquals(new Reference(PerMinuteRateLimiterInterface::class), $definition->getArgument('$limiter'));
+        self::assertSame(PerMinuteRateLimiter::class, (string) $container->getAlias(PerMinuteRateLimiterInterface::class));
         self::assertSame([
             'hooks' => ['path_prefixes' => ['/hooks/slack', '/hooks/email'], 'path_patterns' => [], 'methods' => [], 'limit_per_minute' => 120],
             'ingest' => ['path_prefixes' => [], 'path_patterns' => ['#^/api/[^/]+/ingest#'], 'methods' => ['POST'], 'limit_per_minute' => 60],

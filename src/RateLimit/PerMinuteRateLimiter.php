@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle\RateLimit;
 
+use Nowo\HttpHardeningBundle\Model\RateLimitDecision;
 use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\RateLimiter\RateLimit;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
@@ -25,7 +26,7 @@ use function hash;
  * @author Héctor Franco Aceituno <hectorfranco@nowo.tech>
  * @copyright 2026 Nowo.tech
  */
-final readonly class PerMinuteRateLimiter
+final readonly class PerMinuteRateLimiter implements PerMinuteRateLimiterInterface
 {
     public function __construct(
         private CacheItemPoolInterface $cache,
@@ -69,6 +70,21 @@ final readonly class PerMinuteRateLimiter
         ], new CacheStorage($this->cache));
 
         return $factory->create($key)->consume(1);
+    }
+
+    public function attempt(string $id, string $key, int $limitPerMinute): ?RateLimitDecision
+    {
+        $rateLimit = $this->consume($id, $key, $limitPerMinute);
+        if (!$rateLimit instanceof RateLimit) {
+            return null;
+        }
+
+        return new RateLimitDecision(
+            accepted: $rateLimit->isAccepted(),
+            limit: $rateLimit->getLimit(),
+            remaining: $rateLimit->getRemainingTokens(),
+            retryAfter: $rateLimit->getRetryAfter(),
+        );
     }
 
     /**
