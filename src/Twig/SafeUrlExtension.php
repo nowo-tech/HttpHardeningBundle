@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Nowo\HttpHardeningBundle\Twig;
 
 use Nowo\HttpHardeningBundle\Http\SafeHref;
-use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
+use Nowo\HttpHardeningBundle\Http\SafeInternalRedirectInterface;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
 
@@ -19,7 +19,7 @@ use Twig\TwigFunction;
 final class SafeUrlExtension extends AbstractExtension
 {
     public function __construct(
-        private readonly SafeInternalRedirect $safeInternalRedirect,
+        private readonly SafeInternalRedirectInterface $safeInternalRedirect,
     ) {
     }
 

@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace Nowo\HttpHardeningBundle\EventSubscriber;
 
+use Nowo\HttpHardeningBundle\Event\TenantExistenceMaskedEvent;
 use Nowo\HttpHardeningBundle\Http\RouterPath;
+use Nowo\HttpHardeningBundle\Model\UserRef;
 use Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface;
+use Nowo\HttpHardeningBundle\Security\TenantAccessQueryInterface;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 use function is_string;
 
@@ -20,7 +24,8 @@ use function is_string;
  *
  * An access denial (`AccessDeniedException` from a voter / `denyAccessUnlessGranted()`, or
  * `AccessDeniedHttpException`) on a path matching one of the configured patterns, for a signed-in user with
- * **no** access at all to the captured tenant ({@see TenantAccessCheckerInterface::hasAnyAccess()}), is replaced
+ * **no** access at all to the captured tenant ({@see TenantAccessQueryInterface::hasAnyAccess()}, or the deprecated
+ * {@see TenantAccessCheckerInterface::hasAnyAccess()}), is replaced
  * by a plain `NotFoundHttpException`: a stranger gets exactly the answer of an unknown tenant id and cannot
  * enumerate which ids exist. Members whose role is too low keep their 403; anonymous visitors are left alone (the
  * firewall still sends them to the login / entry point).
@@ -31,6 +36,8 @@ use function is_string;
  *
  * The replacement carries **no** `previous` exception: the firewall `ExceptionListener` walks the exception chain
  * and would turn a nested `AccessDeniedException` back into a 403.
+ *
+ * After a replacement a {@see TenantExistenceMaskedEvent} is dispatched when an event dispatcher is wired.
  *
  * Registered on `kernel.exception` (default priority 16), before the firewall `ExceptionListener` (priority 1).
  * Stateless (FrankenPHP worker-safe).
@@ -51,8 +58,9 @@ final readonly class TenantExistenceMaskSubscriber
      */
     public function __construct(
         private ?TokenStorageInterface $tokenStorage,
-        private TenantAccessCheckerInterface $accessChecker,
+        private TenantAccessCheckerInterface|TenantAccessQueryInterface $accessChecker,
         private array $pathPatterns,
+        private ?EventDispatcherInterface $eventDispatcher = null,
     ) {
     }
 
@@ -72,13 +80,27 @@ final readonly class TenantExistenceMaskSubscriber
         }
 
         $user = $this->tokenStorage?->getToken()?->getUser();
-        if (!$user instanceof UserInterface || $this->accessChecker->hasAnyAccess($user, $tenantId)) {
+        if (!$user instanceof UserInterface || $this->hasAnyAccess($user, $tenantId)) {
             return;
         }
 
         // No `previous`: the firewall walks the exception chain and would turn a nested AccessDeniedException
         // back into a 403.
         $event->setThrowable(new NotFoundHttpException());
+
+        $this->eventDispatcher?->dispatch(new TenantExistenceMaskedEvent($tenantId, $routerPath, $user->getUserIdentifier()));
+    }
+
+    /**
+     * The framework-free port wins when the checker implements both; the user reaches it as a {@see UserRef}.
+     */
+    private function hasAnyAccess(UserInterface $user, string $tenantId): bool
+    {
+        if ($this->accessChecker instanceof TenantAccessQueryInterface) {
+            return $this->accessChecker->hasAnyAccess(new UserRef($user->getUserIdentifier(), $user->getRoles()), $tenantId);
+        }
+
+        return $this->accessChecker->hasAnyAccess($user, $tenantId);
     }
 
     /**

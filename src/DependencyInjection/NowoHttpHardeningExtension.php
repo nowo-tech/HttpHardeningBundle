@@ -6,6 +6,7 @@ namespace Nowo\HttpHardeningBundle\DependencyInjection;
 
 use LogicException;
 use Nowo\HttpHardeningBundle\Command\LintCspNoncesCommand;
+use Nowo\HttpHardeningBundle\Csp\CspSourceContributorInterface;
 use Nowo\HttpHardeningBundle\Csp\CspSourceProviderInterface;
 use Nowo\HttpHardeningBundle\Csp\InlineNonceLinter;
 use Nowo\HttpHardeningBundle\DependencyInjection\Compiler\WebProfilerCspHandlerPass;
@@ -19,8 +20,10 @@ use Nowo\HttpHardeningBundle\EventSubscriber\RouteHeadersSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\SecurityHeadersSubscriber;
 use Nowo\HttpHardeningBundle\EventSubscriber\TenantExistenceMaskSubscriber;
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
+use Nowo\HttpHardeningBundle\Http\SafeInternalRedirectInterface;
 use Nowo\HttpHardeningBundle\Http\TrustedHostsEnvVarProcessor;
 use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiter;
+use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiterInterface;
 use Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface;
 use Nowo\HttpHardeningBundle\Twig\CspNonceExtension;
 use Nowo\HttpHardeningBundle\Twig\SafeUrlExtension;
@@ -103,6 +106,8 @@ final class NowoHttpHardeningExtension extends Extension
     {
         $container->registerForAutoconfiguration(CspSourceProviderInterface::class)
             ->addTag(CspSourceProviderInterface::TAG);
+        $container->registerForAutoconfiguration(CspSourceContributorInterface::class)
+            ->addTag(CspSourceContributorInterface::CONTRIBUTOR_TAG);
 
         // The linter needs no runtime config: available even while the CSP header is disabled.
         $container->setDefinition(InlineNonceLinter::class, new Definition(InlineNonceLinter::class));
@@ -136,6 +141,7 @@ final class NowoHttpHardeningExtension extends Extension
         $definition->setArgument('$debugRelaxations', (bool) $csp['debug_relaxations']);
         $definition->setArgument('$reportOnly', (bool) $csp['report_only']);
         $definition->setArgument('$nonceFreeStylePathPrefixes', array_values(array_map(strval(...), (array) $csp['nonce_free_style_path_prefixes'])));
+        $definition->setArgument('$sourceContributors', new TaggedIteratorArgument(CspSourceContributorInterface::CONTRIBUTOR_TAG));
         $definition->addTag('kernel.event_listener', [
             'event' => 'kernel.request',
             'method' => 'onRequest',
@@ -247,6 +253,8 @@ final class NowoHttpHardeningExtension extends Extension
             return;
         }
 
+        // Unset: the interface alias. TenantAccessCheckerPass switches it to the framework-free
+        // TenantAccessQueryInterface when the host registered that port.
         $checker = is_string($mask['access_checker']) && '' !== $mask['access_checker']
             ? $mask['access_checker']
             : TenantAccessCheckerInterface::class;
@@ -255,6 +263,7 @@ final class NowoHttpHardeningExtension extends Extension
         $definition->setArgument('$tokenStorage', new Reference('security.token_storage', ContainerBuilder::NULL_ON_INVALID_REFERENCE));
         $definition->setArgument('$accessChecker', new Reference($checker));
         $definition->setArgument('$pathPatterns', array_values(array_map(strval(...), (array) $mask['path_patterns'])));
+        $definition->setArgument('$eventDispatcher', new Reference('event_dispatcher', ContainerBuilder::NULL_ON_INVALID_REFERENCE));
         // Before the firewall ExceptionListener (priority 1) turns an AccessDeniedException into a 403.
         $definition->addTag('kernel.event_listener', [
             'event' => 'kernel.exception',
@@ -308,6 +317,7 @@ final class NowoHttpHardeningExtension extends Extension
         $definition = new Definition(SafeInternalRedirect::class);
         $definition->setArgument('$requestStack', new Reference('request_stack', ContainerBuilder::NULL_ON_INVALID_REFERENCE));
         $container->setDefinition(SafeInternalRedirect::class, $definition);
+        $container->setAlias(SafeInternalRedirectInterface::class, SafeInternalRedirect::class);
 
         if (!$safeUrls['twig_functions'] || !$this->classAvailable(AbstractExtension::class)) {
             return;
@@ -341,6 +351,7 @@ final class NowoHttpHardeningExtension extends Extension
         $limiter = new Definition(PerMinuteRateLimiter::class);
         $limiter->setArgument('$cache', new Reference((string) $rateLimit['cache_pool']));
         $container->setDefinition(PerMinuteRateLimiter::class, $limiter);
+        $container->setAlias(PerMinuteRateLimiterInterface::class, PerMinuteRateLimiter::class);
 
         if (true !== $rateLimit['enabled']) {
             return;
@@ -361,9 +372,10 @@ final class NowoHttpHardeningExtension extends Extension
         }
 
         $definition = new Definition(RateLimitSubscriber::class);
-        $definition->setArgument('$limiter', new Reference(PerMinuteRateLimiter::class));
+        $definition->setArgument('$limiter', new Reference(PerMinuteRateLimiterInterface::class));
         $definition->setArgument('$rules', $rules);
         $definition->setArgument('$limitProviders', $providers);
+        $definition->setArgument('$eventDispatcher', new Reference('event_dispatcher', ContainerBuilder::NULL_ON_INVALID_REFERENCE));
         $definition->addTag('kernel.event_listener', [
             'event' => 'kernel.request',
             'method' => '__invoke',

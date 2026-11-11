@@ -22,6 +22,55 @@
 
 ## Unreleased
 
+Target: **1.10.0**. From **1.9.0**: `composer update nowo-tech/http-hardening-bundle`. No breaking change: hosts on the
+old ports keep working; the new ports are opt-in.
+
+### Deprecations (removed in 2.0)
+
+| Deprecated (1.10.0) | Replacement |
+|---------------------|-------------|
+| `Security\TenantAccessCheckerInterface::hasAnyAccess(UserInterface $user, string $tenantId)` | `Security\TenantAccessQueryInterface::hasAnyAccess(UserRef $user, string $tenantId)` |
+| `RateLimit\RateLimitProviderInterface::limitPerMinute(string $rule, Request $request)` | `RateLimit\RuleLimitProviderInterface::limitPerMinute(string $rule, HttpRequestInfo $request)` |
+| `Csp\CspSourceProviderInterface::getSources(Request $request)` (tag `nowo_http_hardening.csp_source_provider`) | `Csp\CspSourceContributorInterface::getSources(HttpRequestInfo $request)` (tag `nowo_http_hardening.csp_source_contributor`, autoconfigured) |
+
+Each host service still implementing only an old port triggers one deprecation when the container is built
+(`nowo-tech/http-hardening-bundle 1.10.0: Service "…" implements "…", which is removed in 2.0`).
+
+### Migration
+
+1. **Tenant checker.** Change the interface and the user type; read the identifier (and roles, if your rule uses an
+   admin override role) from the `UserRef`:
+
+   ```php
+   // before
+   public function hasAnyAccess(UserInterface $user, string $tenantId): bool
+   {
+       return $this->memberships->hasAny($user->getUserIdentifier(), strtolower($tenantId));
+   }
+
+   // after (implements TenantAccessQueryInterface)
+   public function hasAnyAccess(UserRef $user, string $tenantId): bool
+   {
+       return $this->memberships->hasAny($user->identifier, strtolower($tenantId));
+   }
+   ```
+
+   `UserRef::$roles` are the user's own roles (`UserInterface::getRoles()`), not the role-hierarchy expansion. If your
+   old checker needed the user entity (`$user instanceof User`), load it by identifier in the adapter. Keep returning
+   `false` for unknown or malformed ids. With `access_checker` unset, the bundle now picks the
+   `TenantAccessQueryInterface` alias first; an explicit `access_checker` service id is used as configured.
+   During the migration a class may implement both interfaces: the new one is called.
+2. **Rate-limit provider.** Change the interface and read what you need from `HttpRequestInfo` (`routerPath`,
+   `pathInfo`, `method`, `clientIp`, `host`, `routeName`, `routeParams`). The rule's `limit_provider` service id stays
+   the same.
+3. **CSP sources.** Implement `CspSourceContributorInterface` instead of `CspSourceProviderInterface`; with
+   autoconfiguration nothing else changes. The constant is `CONTRIBUTOR_TAG` (not `TAG`), so a class may implement
+   both during the migration.
+4. **Optional:** type-hint `PerMinuteRateLimiterInterface` / `SafeInternalRedirectInterface` instead of the classes;
+   `PerMinuteRateLimiterInterface::attempt()` returns a framework-free `RateLimitDecision` (`consume()` and its
+   `RateLimit` stay on the class).
+5. **Optional:** listen to `TenantExistenceMaskedEvent` / `RateLimitExceededEvent` for security logs.
+
 ## To 1.9.0
 
 From **1.8.0**:

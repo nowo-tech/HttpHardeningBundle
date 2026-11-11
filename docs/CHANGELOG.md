@@ -27,9 +27,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Target: **1.10.0** (minor, no breaking change). See [UPGRADING](UPGRADING.md#unreleased).
+
+### Added
+
+- **Framework-free ports (REQ-ARCH-001 rule 3):** `Security\TenantAccessQueryInterface::hasAnyAccess(UserRef, string)`,
+  `RateLimit\RuleLimitProviderInterface::limitPerMinute(string, HttpRequestInfo)` and
+  `Csp\CspSourceContributorInterface::getSources(HttpRequestInfo)` (autoconfigured, tag
+  `nowo_http_hardening.csp_source_contributor`), with the bundle-owned value objects `Model\UserRef` (user identifier +
+  own roles) and `Model\HttpRequestInfo` (method, scheme, host, port, raw and decoded path, client IP, route name,
+  scalar route parameters), built by `Http\HttpRequestInfoFactory`. When a service implements both the old and the new
+  port, the new one is called (once).
+- **Interfaces for the services (rule 1):** `RateLimit\PerMinuteRateLimiterInterface` (`accept()`, new `attempt()`
+  returning a framework-free `Model\RateLimitDecision`) and `Http\SafeInternalRedirectInterface`
+  (`resolveForCurrentRequest()`, new `resolveForOrigin()`), both aliased to the existing services.
+  `SafeInternalRedirect::resolve()`, `resolveForCurrentRequest()` and `resolveForOrigin()` share one validation.
+- **Security events (rule 4):** `Event\TenantExistenceMaskedEvent` (tenant id, decoded path, user identifier) after a
+  masked denial and `Event\RateLimitExceededEvent` (rule, hashed client key, limit, decoded path, `Retry-After`) after a
+  429; scalars only, dispatched when an event dispatcher is wired.
+- `tenant_existence_mask.access_checker` unset now resolves to the `TenantAccessQueryInterface` alias when the host
+  registered one, else to the `TenantAccessCheckerInterface` alias (unchanged); with neither the container build still
+  fails.
+- Tests: old-vs-new port equivalence (tenant decision matrix, rate-limit throttling, CSP policy, open-redirect corpus)
+  and a DDD-host kernel wired only with the new ports that answers like the standard host.
+
+### Deprecated
+
+- `Security\TenantAccessCheckerInterface`, `RateLimit\RateLimitProviderInterface` and
+  `Csp\CspSourceProviderInterface` (they take Symfony `UserInterface` / `Request`): use the framework-free ports above.
+  They keep working until 2.0; the container build reports a deprecation for each host service that implements one
+  without its replacement.
+
 ### Changed
 
-- Docs: new USAGE section "Using it from a DDD / hexagonal application" (where the bundle sits in a hexagonal host, the ports, events and DTOs to build an anti-corruption layer on, and the known limitations).
+- Docs: USAGE section "Standard host and DDD host" (replaces "Using it from a DDD / hexagonal application"): both host
+  paths, the framework-free ports, value objects and events.
+- `composer.json` requires `symfony/deprecation-contracts` and `symfony/event-dispatcher-contracts` explicitly (both were
+  already installed through `symfony/http-kernel`).
+- `RateLimitSubscriber` depends on `PerMinuteRateLimiterInterface` (the service id `PerMinuteRateLimiter` is
+  unchanged), `SafeUrlExtension` on `SafeInternalRedirectInterface`.
 
 ## [1.9.0] - 2026-11-05
 

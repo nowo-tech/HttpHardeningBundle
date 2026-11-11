@@ -23,8 +23,9 @@ After installation, security headers apply on every main response when `security
   - [Path rules (429)](#path-rules-429)
   - [Runtime limits](#runtime-limits)
   - [Limiter service](#limiter-service)
-- [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
-  - [Known limitations](#known-limitations)
+- [Standard host and DDD host](#standard-host-and-ddd-host)
+  - [Standard host](#standard-host)
+  - [DDD host](#ddd-host)
 
 ## Security headers
 
@@ -90,14 +91,14 @@ Exit code is non-zero when an inline `<script>` / `<style>` with a body has no `
 ### Runtime sources
 
 ```php
-use Nowo\HttpHardeningBundle\Csp\CspSourceProviderInterface;
-use Symfony\Component\HttpFoundation\Request;
+use Nowo\HttpHardeningBundle\Csp\CspSourceContributorInterface;
+use Nowo\HttpHardeningBundle\Model\HttpRequestInfo;
 
-final class ImageCdnCspSources implements CspSourceProviderInterface
+final class ImageCdnCspSources implements CspSourceContributorInterface
 {
     public function __construct(private readonly ImageCdnSettings $settings) {}
 
-    public function getSources(Request $request): array
+    public function getSources(HttpRequestInfo $request): array
     {
         $origin = $this->settings->activeOrigin(); // e.g. https://ik.imagekit.io
         return null === $origin ? [] : ['img-src' => [$origin]];
@@ -106,6 +107,11 @@ final class ImageCdnCspSources implements CspSourceProviderInterface
 ```
 
 With autoconfiguration on, the class is tagged automatically.
+
+`CspSourceContributorInterface` (1.10.0) is autoconfigured (tag `nowo_http_hardening.csp_source_contributor`) and
+receives a framework-free `HttpRequestInfo` (method, scheme, host, port, raw and decoded path, client IP, route name
+and scalar route parameters). The older `CspSourceProviderInterface::getSources(Request)` still works and is
+deprecated (removed in 2.0); a service implementing both is asked once, through the new port.
 
 ## Public cache
 
@@ -182,25 +188,34 @@ nowo_http_hardening:
         # access_checker: App\Security\ProjectExistenceChecker   # optional, default: the interface alias
 ```
 
-Implement the SPI (autowiring aliases the interface to your class when it is the only implementation):
+Implement the port (autowiring aliases the interface to your class when it is the only implementation):
 
 ```php
-use Nowo\HttpHardeningBundle\Security\TenantAccessCheckerInterface;
-use Symfony\Component\Security\Core\User\UserInterface;
+use Nowo\HttpHardeningBundle\Model\UserRef;
+use Nowo\HttpHardeningBundle\Security\TenantAccessQueryInterface;
 
-final readonly class ProjectExistenceChecker implements TenantAccessCheckerInterface
+final readonly class ProjectExistenceChecker implements TenantAccessQueryInterface
 {
     public function __construct(private ProjectRepository $projects, private ProjectAccess $access) {}
 
-    public function hasAnyAccess(UserInterface $user, string $tenantId): bool
+    public function hasAnyAccess(UserRef $user, string $tenantId): bool
     {
         $project = $this->projects->findOneBy(['uuid' => strtolower($tenantId)]);
 
         // Unknown id → false (404 anyway); any membership, share grant or admin override → true (keep 403).
-        return null !== $project && $user instanceof User && $this->access->hasAny($project, $user);
+        return null !== $project && $this->access->hasAnyByIdentifier($project, $user->identifier);
     }
 }
 ```
+
+`UserRef` carries the signed-in user's identifier (`getUserIdentifier()`) and own roles (`getRoles()`, not the role
+hierarchy). The older `TenantAccessCheckerInterface::hasAnyAccess(UserInterface, string)` still works and is
+deprecated (removed in 2.0). With `access_checker` unset, the bundle uses the `TenantAccessQueryInterface` alias when
+it exists, else the `TenantAccessCheckerInterface` alias; with neither, the container build fails (the mask never
+guesses). A class implementing both is called through the new port only.
+
+After each masked denial a `Event\TenantExistenceMaskedEvent` (tenant id, decoded path, user identifier) is
+dispatched, for security logs.
 
 | Who | Before | After |
 | --- | --- | --- |
@@ -258,8 +273,12 @@ Nothing to do: in dev the bundle makes WebProfilerBundle's `web_profiler.csp.han
 use Nowo\HttpHardeningBundle\Http\SafeInternalRedirect;
 
 $target = SafeInternalRedirect::resolve($request, (string) $request->query->get('next'), '/');
-// or the autowirable service: $safeInternalRedirect->resolveForCurrentRequest($next, '/')
+// or the autowirable service (Http\SafeInternalRedirectInterface, 1.10.0):
+$target = $safeInternalRedirect->resolveForCurrentRequest($next, '/');
+$target = $safeInternalRedirect->resolveForOrigin('https://app.example', $next, '/'); // no Request needed
 ```
+
+All three entry points share one validation.
 
 Absolute same-host URLs are reduced to path + query; protocol-relative URLs, backslashes, encoded separators and control characters fall back. With `safe_urls.twig_functions: true`:
 
@@ -305,14 +324,14 @@ A client IP sending more than 120 requests per sliding minute to those paths get
 ### Runtime limits
 
 ```php
-use Nowo\HttpHardeningBundle\RateLimit\RateLimitProviderInterface;
-use Symfony\Component\HttpFoundation\Request;
+use Nowo\HttpHardeningBundle\Model\HttpRequestInfo;
+use Nowo\HttpHardeningBundle\RateLimit\RuleLimitProviderInterface;
 
-final readonly class IngestLimitFromSettings implements RateLimitProviderInterface
+final readonly class IngestLimitFromSettings implements RuleLimitProviderInterface
 {
     public function __construct(private InstanceSettings $settings) {}
 
-    public function limitPerMinute(string $rule, Request $request): int
+    public function limitPerMinute(string $rule, HttpRequestInfo $request): int
     {
         return $this->settings->ingestIpRateLimit(); // 0 lets every request through
     }
@@ -329,11 +348,14 @@ nowo_http_hardening:
                 limit_provider: App\RateLimit\IngestLimitFromSettings
 ```
 
-The provider runs on every matching request: keep it cheap (cached settings) and stateless.
+The provider runs on every matching request: keep it cheap (cached settings) and stateless. It receives a
+framework-free `HttpRequestInfo`; the older `RateLimitProviderInterface::limitPerMinute(string, Request)` still works
+and is deprecated (removed in 2.0). Each 429 dispatches an `Event\RateLimitExceededEvent` (rule, hashed client key,
+limit, decoded path, `Retry-After` seconds; never the raw IP).
 
 ### Limiter service
 
-For guards that are not a path rule (per project, per API token), inject `PerMinuteRateLimiter` (autowirable, `cache.app` or `rate_limit.cache_pool`):
+For guards that are not a path rule (per project, per API token), inject `PerMinuteRateLimiterInterface` (1.10.0) or `PerMinuteRateLimiter` (autowirable, `cache.app` or `rate_limit.cache_pool`):
 
 ```php
 use Nowo\HttpHardeningBundle\RateLimit\PerMinuteRateLimiter;
@@ -344,32 +366,55 @@ if (!$this->limiter->accept('api_token', 'token_'.$tokenId, $project->getRateLim
 
 $state = $this->limiter->consume('webhook_ip', PerMinuteRateLimiter::ipKey($request->getClientIp() ?? ''), 30);
 // null when the limit is 0 (disabled); otherwise a RateLimit with getRemainingTokens() / getRetryAfter()
+
+$decision = $this->limiter->attempt('webhook_ip', PerMinuteRateLimiter::ipKey($clientIp), 30);
+// the same through the interface, framework-free: null or a RateLimitDecision (accepted, limit, remaining, retryAfter)
 ```
 
 `$id` separates the buckets of each guard, `$key` is the bucket inside it; `ipKey()` hashes the client IP (`ip_<xxh128>`, `unknown` when empty) so raw addresses never reach the cache keys. A limit of `0` or less disables the check. Without a lock two concurrent requests may both pass on the last token: fine for abuse throttling, not for billing quotas.
 
-## Using it from a DDD / hexagonal application
+## Standard host and DDD host
 
 HttpHardeningBundle is an HTTP edge adapter (headers, CSP, caching rules, tenant masking, rate limiting). It has no
-entities and no Doctrine code, and it never sees your domain model. Everything is driven by configuration plus three
-small ports that you implement in your infrastructure layer:
+entities and no Doctrine code, and it never sees your domain model. Everything is driven by configuration plus a few
+small ports that you implement in your infrastructure layer.
+
+### Standard host
+
+Nothing to do beyond the configuration: install, enable the features you need, and implement the ports above as
+ordinary services (autowiring aliases each interface to your class when it is the only implementation). Inject
+`PerMinuteRateLimiter` / `SafeInternalRedirect` or their interfaces in controllers. Hosts written before 1.10.0 on
+`TenantAccessCheckerInterface`, `RateLimitProviderInterface` or `CspSourceProviderInterface` keep working unchanged;
+the container build reports a deprecation for each such service (see [UPGRADING](UPGRADING.md#unreleased)).
+
+### DDD host
+
+Implement only the framework-free ports; none of their signatures carries a Symfony or Doctrine type:
 
 | Port | Use it to |
 |------|-----------|
-| `Security\TenantAccessCheckerInterface::hasAnyAccess(UserInterface, string $tenantId)` | answer "may this user know tenant X exists?" for `tenant_existence_mask` |
-| `RateLimit\RateLimitProviderInterface::limitPerMinute(string $rule, Request)` | read a runtime limit (settings, plan quota) for a `rate_limit` rule |
-| `Csp\CspSourceProviderInterface::getSources(Request)` | add CSP sources known only at runtime (e.g. a CDN origin from settings) |
+| `Security\TenantAccessQueryInterface::hasAnyAccess(UserRef, string $tenantId)` | answer "may this user know tenant X exists?" for `tenant_existence_mask` |
+| `RateLimit\RuleLimitProviderInterface::limitPerMinute(string $rule, HttpRequestInfo)` | read a runtime limit (settings, plan quota) for a `rate_limit` rule |
+| `Csp\CspSourceContributorInterface::getSources(HttpRequestInfo)` | add CSP sources known only at runtime (e.g. a CDN origin from settings) |
+| `RateLimit\PerMinuteRateLimiterInterface` (`accept()`, `attempt()` → `RateLimitDecision`) | throttle your own guards from application code |
+| `Http\SafeInternalRedirectInterface` (`resolveForOrigin()`, `resolveForCurrentRequest()`) | validate a redirect target |
 
-Keep the adapters thin and delegate to an application query:
+Value objects (`Model\UserRef`, `Model\HttpRequestInfo`, `Model\RateLimitDecision`) and events
+(`Event\TenantExistenceMaskedEvent`, `Event\RateLimitExceededEvent`, scalars only, extending
+`Symfony\Contracts\EventDispatcher\Event`) are bundle-owned. Keep the adapters thin and delegate to an application
+query:
 
 ```php
-final readonly class MembershipTenantAccessChecker implements TenantAccessCheckerInterface
+use Nowo\HttpHardeningBundle\Model\UserRef;
+use Nowo\HttpHardeningBundle\Security\TenantAccessQueryInterface;
+
+final readonly class MembershipTenantAccessChecker implements TenantAccessQueryInterface
 {
     public function __construct(private TenantMembershipQuery $memberships) {} // your application port
 
-    public function hasAnyAccess(UserInterface $user, string $tenantId): bool
+    public function hasAnyAccess(UserRef $user, string $tenantId): bool
     {
-        return $this->memberships->userHasAnyRole($user->getUserIdentifier(), strtolower($tenantId));
+        return $this->memberships->userHasAnyRole($user->identifier, strtolower($tenantId));
     }
 }
 ```
@@ -382,11 +427,8 @@ nowo_http_hardening:
         access_checker: App\Infrastructure\Security\MembershipTenantAccessChecker
 ```
 
-- Implementations must be stateless (FrankenPHP worker mode) and cheap: they run on matching requests.
-- In application code, prefer your own port over calling `PerMinuteRateLimiter` directly; implement the port with it.
-
-### Known limitations
-
-- No events are dispatched for rate-limited requests or masked tenant denials; decorate the subscribers if you
-  need to audit them.
-- `PerMinuteRateLimiter` has no interface.
+- Implementations must be stateless (FrankenPHP worker mode, kernel reset false) and cheap: they run on matching
+  requests.
+- Return `false` for an unknown or malformed tenant id: deny by default.
+- The test suite boots such a host (`tests/Functional/App/DddHostKernel.php`, adapters under `DddHost/` with no
+  Symfony import) and checks it answers exactly like the standard host.
