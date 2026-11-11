@@ -3,6 +3,9 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.10.0](#to-1100)
+  - [Deprecations (removed in 2.0)](#deprecations-removed-in-20)
+  - [Migration](#migration)
 - [To 1.9.0](#to-190)
 - [To 1.8.0](#to-180)
 - [To 1.7.2](#to-172)
@@ -21,6 +24,14 @@
 - [First install](#first-install)
 
 ## Unreleased
+
+## To 1.10.0
+
+From **1.9.0**:
+
+```bash
+composer update nowo-tech/http-hardening-bundle
+```
 
 Target: **1.10.0**. From **1.9.0**: `composer update nowo-tech/http-hardening-bundle`. No breaking change: hosts on the
 old ports keep working; the new ports are opt-in.
