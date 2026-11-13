@@ -18,4 +18,4 @@
 
 - Run `make test`, `make phpstan`, and `make cs-check` before release.
 - New blocking I/O needs an explicit timeout and a test (REQ-RUNTIME-001).
-- Keep PHP line coverage at or above 99% (prefer 100%).
+- Keep PHP line coverage at 100%.

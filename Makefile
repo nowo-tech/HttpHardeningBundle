@@ -25,7 +25,7 @@ help:
 	@echo "  assets        No-op (no frontend in this bundle)"
 	@echo "  test          Run PHPUnit tests (starts container if needed)"
 	@echo "  test-coverage Run tests with code coverage (starts container if needed)"
-	@echo "  coverage-check Fail when PHP statement coverage is below 99 percent"
+	@echo "  coverage-check Fail when PHP statement coverage is below 100 percent"
 	@echo "  test-coverage-100 Fail unless PHP statement coverage is 100 percent"
 	@echo "  cs-check      Check code style"
 	@echo "  cs-fix        Fix code style"
@@ -78,7 +78,7 @@ test: ensure-up
 test-coverage: ensure-up
 	$(COMPOSE) exec $(SERVICE_PHP) composer test-coverage | tee coverage-php.txt
 	./.scripts/php-coverage-percent.sh coverage-php.txt
-	./.scripts/coverage-check.sh coverage.xml 99
+	./.scripts/coverage-check.sh coverage.xml 100
 
 coverage-check: test-coverage
 

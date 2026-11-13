@@ -112,7 +112,7 @@ Config root: `nowo_http_hardening`.
 | ID | Criterion |
 | ---- | --------- |
 | SC-01 | `git ls-files src \| wc -l` equals the mapped count in `code-inventory.md` (**25/25**, all shipped features 001–006) |
-| SC-02 | PHPUnit covers `src/` at ≥99% statements (target 100%) |
+| SC-02 | PHPUnit covers `src/` at 100% statements |
 | SC-03 | `make release-check` passes on the release commit |
 | SC-04 | CI `ci.yml` green on default branch |
 

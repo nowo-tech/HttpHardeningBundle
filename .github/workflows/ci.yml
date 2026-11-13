@@ -82,7 +82,7 @@ jobs:
         run: |
           composer test-coverage
           chmod +x .scripts/coverage-check.sh
-          ./.scripts/coverage-check.sh coverage.xml 99
+          ./.scripts/coverage-check.sh coverage.xml 100
 
   phpstan:
     name: PHPStan (REQ-CS-006)
