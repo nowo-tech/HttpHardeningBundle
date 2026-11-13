@@ -76,7 +76,7 @@ make test
 make test-coverage
 ```
 
-PHP statement coverage: **100%** (Clover gate ≥99% in CI).
+PHP statement coverage: **100%** (Clover gate 100% in CI).
 
 - PHP: 100%
 - TS/JS: N/A

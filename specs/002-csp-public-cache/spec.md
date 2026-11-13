@@ -133,7 +133,7 @@ Config root: `nowo_http_hardening` (`csp`, `public_cache`, `canonical_host`, `sa
 | ID | Criterion |
 | ---- | --------- |
 | SC-01 | All `src/` files mapped in [code-inventory.md](code-inventory.md) or the baseline inventory |
-| SC-02 | PHPUnit statement coverage of `src/` stays ≥99% (100% at time of writing) |
+| SC-02 | PHPUnit statement coverage of `src/` stays at 100% |
 | SC-03 | `make cs-check`, `make phpstan`, `make rector-dry`, `make igor`, `make test-coverage` green |
 | SC-04 | With default config the container registers no new listener |
 

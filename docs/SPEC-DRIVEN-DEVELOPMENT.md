@@ -60,7 +60,7 @@ Mechanical proof is **PHPUnit** + **PHPStan** + **Igor**. There is no separate e
 
 | Command | Proves |
 | ------- | ------ |
-| `make test` / `make test-coverage` | Unit behavior (PHP statements >= 99%, target 100%) |
+| `make test` / `make test-coverage` | Unit behavior (PHP statements = 100%) |
 | `make phpstan` / `make cs-check` / `make rector-dry` / `make igor` | Static quality / worker audit |
 | `make release-check` | Full pre-release gate |
 
@@ -77,7 +77,7 @@ Behavior changes **require** tests under `tests/`.
 | REQ-MAKE-009 | `Makefile` | No path outside this git repository |
 | REQ-GIT-001 | `.githooks/`, `.scripts/check-no-cursor-coauthor.sh` | No Cursor co-author trailers |
 | REQ-REL-003 | `.scripts/check-open-prs.sh` | No unresolved open pull requests |
-| REQ-TEST-003 | coverage gate | Clover statements >= 99% |
+| REQ-TEST-003 | coverage gate | Clover statements = 100% |
 | REQ-SEC-001..004 | `docs/SECURITY.md`, `.github/SECURITY.md` | Security docs + AI audit Pass (good) |
 
 ## Contributor workflow

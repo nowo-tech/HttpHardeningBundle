@@ -3,7 +3,7 @@
 set -eu
 
 FILE="${1:-coverage.xml}"
-MIN="${2:-99}"
+MIN="${2:-100}"
 
 if [ ! -f "$FILE" ]; then
   echo "ERROR: coverage file not found: $FILE" >&2
