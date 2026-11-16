@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- Spec Kit baseline: `specs/001-baseline/code-inventory.md` maps all 44 tracked `src/` files (1.8–1.10 additions) and `spec.md` gains FR-RL-001..003, FR-RH-001, FR-TM-009 and FR-PORT-001..003 (REQ-SPECKIT-001/003).
+
 ### Changed
 
 - CI and `make test-coverage`: the Clover statement-coverage gate is now **100%** (was 99%). The suite is already at 100%; the gate only stops a regression from merging.

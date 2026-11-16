@@ -1,9 +1,9 @@
 # Code inventory — baseline (100% of production `src/`)
 
-**Last audited:** 2026-10-20  
-**Aligned with:** **v1.7.0**
+**Last audited:** 2026-11-16  
+**Aligned with:** **v1.10.0**
 
-Canonical inventory: every file tracked under `src/` (audit: `git ls-files src | wc -l` → **25**), including the files added by the feature specs [002](../002-csp-public-cache/code-inventory.md)–[006](../006-tenant-existence-mask/code-inventory.md) (which keep their own per-feature deltas). Tests and tooling are out of scope.
+Canonical inventory: every file tracked under `src/` (audit: `git ls-files src | wc -l` → **44**), including the files added by the feature specs [002](../002-csp-public-cache/code-inventory.md)–[006](../006-tenant-existence-mask/code-inventory.md) (which keep their own per-feature deltas). Tests and tooling are out of scope.
 
 ## Bundle / DI
 
@@ -60,6 +60,30 @@ Canonical inventory: every file tracked under `src/` (audit: `git ls-files src |
 | `src/Twig/CspNonceExtension.php` | CSP (002) | FR-CSP-010 |
 | `src/Twig/SafeUrlExtension.php` | Safe URLs (002) | FR-SAFE-004 |
 
+## Additions 1.8–1.10 (rate limiting, route headers, framework-free ports)
+
+| Path | Spec section | Requirement ID(s) |
+| ---- | ------------ | ----------------- |
+| `src/Csp/CspSourceContributorInterface.php` | Ports (1.10) | FR-PORT-002 |
+| `src/DependencyInjection/Compiler/LegacyPortDeprecationPass.php` | Ports (1.10) | FR-PORT-003 |
+| `src/DependencyInjection/Compiler/RateLimitEventKeyPass.php` | Rate limiting (1.8) | FR-RL-003 |
+| `src/DependencyInjection/Compiler/TenantAccessCheckerPass.php` | Ports (1.10) | FR-PORT-001, FR-TM-005 |
+| `src/Event/RateLimitExceededEvent.php` | Rate limiting (1.8) | FR-RL-003 |
+| `src/Event/TenantExistenceMaskedEvent.php` | Tenant existence mask (006) | FR-TM-009 |
+| `src/EventSubscriber/RateLimitSubscriber.php` | Rate limiting (1.8) | FR-RL-002 |
+| `src/EventSubscriber/RouteHeadersSubscriber.php` | Route headers (1.9) | FR-RH-001 |
+| `src/Http/HttpRequestInfoFactory.php` | Ports (1.10) | FR-PORT-001 |
+| `src/Http/RouterPath.php` | HTTP helpers | FR-RL-002, FR-RH-001 |
+| `src/Http/SafeInternalRedirectInterface.php` | Safe URLs (002) | FR-SAFE-004 |
+| `src/Model/HttpRequestInfo.php` | Ports (1.10) | FR-PORT-001 |
+| `src/Model/RateLimitDecision.php` | Rate limiting (1.8) | FR-RL-001 |
+| `src/Model/UserRef.php` | Ports (1.10) | FR-PORT-001 |
+| `src/RateLimit/PerMinuteRateLimiter.php` | Rate limiting (1.8) | FR-RL-001 |
+| `src/RateLimit/PerMinuteRateLimiterInterface.php` | Rate limiting (1.8) | FR-RL-001 |
+| `src/RateLimit/RateLimitProviderInterface.php` | Rate limiting (1.8) | FR-RL-002, FR-PORT-003 |
+| `src/RateLimit/RuleLimitProviderInterface.php` | Rate limiting (1.8) | FR-RL-002, FR-PORT-001 |
+| `src/Security/TenantAccessQueryInterface.php` | Ports (1.10) | FR-PORT-001, FR-TM-005 |
+
 ## Coverage summary
 
 | Category | Files | Mapped |
@@ -70,6 +94,7 @@ Canonical inventory: every file tracked under `src/` (audit: `git ls-files src |
 | HTTP helpers | 7 | 7 |
 | Security SPI | 1 | 1 |
 | Twig | 2 | 2 |
-| **Total production files (`git ls-files src`)** | **25** | **25** |
+| Additions 1.8–1.10 | 19 | 19 |
+| **Total production files (`git ls-files src`)** | **44** | **44** |
 
-**Inventory complete — 25/25.**
+**Inventory complete — 44/44.**

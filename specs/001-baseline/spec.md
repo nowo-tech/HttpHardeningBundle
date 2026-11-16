@@ -100,6 +100,34 @@ Config root: `nowo_http_hardening`.
 | FR-UPL-001 | `JsonUpload::decodeObject(?UploadedFile, int $maxBytes)` checks the declared size, reads at most cap + 1 bytes and only accepts a JSON object |
 | FR-UPL-002 | Failures throw `JsonUploadException` with a `reason` constant (`missing_file`, `too_large`, `invalid_json`) |
 
+### Rate limiting (`FR-RL-*`, 1.8)
+
+| ID | Requirement |
+| ---- | ----------- |
+| FR-RL-001 | `PerMinuteRateLimiter` is a sliding-window "N per minute" limiter over a PSR-6 pool (`cache.app` by default) returning a framework-free `RateLimitDecision`; client IPs are hashed before they become cache keys |
+| FR-RL-002 | Opt-in `rate_limit.rules`: `RateLimitSubscriber` answers 429 with `Retry-After` for an exceeded main request on a configured path (matched on `RouterPath`); a rule's runtime limit may come from a host `RuleLimitProviderInterface` (or the deprecated `RateLimitProviderInterface`) |
+| FR-RL-003 | Every 429 dispatches `RateLimitExceededEvent` (scalars only); its `clientKey` is an HMAC keyed with `kernel.secret` (`RateLimitEventKeyPass`), never the raw IP |
+
+### Route headers (`FR-RH-*`, 1.9)
+
+| ID | Requirement |
+| ---- | ----------- |
+| FR-RH-001 | `route_headers`: `RouteHeadersSubscriber` sets framing, referrer, robots and no-store headers on main requests whose route matches a configured rule, without overwriting headers already set |
+
+### Tenant existence mask events (1.10)
+
+| ID | Requirement |
+| ---- | ----------- |
+| FR-TM-009 | `TenantExistenceMaskedEvent` is dispatched after `tenant_existence_mask` replaced an access denial with a 404 (security observability, scalars only) |
+
+### Framework-free ports (`FR-PORT-*`, REQ-ARCH-001, 1.10)
+
+| ID | Requirement |
+| ---- | ----------- |
+| FR-PORT-001 | Host ports receive bundle-owned VOs only: `HttpRequestInfo` (built by `HttpRequestInfoFactory`) and `UserRef`; `TenantAccessQueryInterface` is the framework-free tenant port, wired as the default checker by `TenantAccessCheckerPass` |
+| FR-PORT-002 | `CspSourceContributorInterface` lets hosts add runtime CSP sources without Symfony types |
+| FR-PORT-003 | `LegacyPortDeprecationPass` reports once per container build host services wired to a port deprecated in 1.10.0 (removed in 2.0) |
+
 ### Security docs
 
 | ID | Requirement |
