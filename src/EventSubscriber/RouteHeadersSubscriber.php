@@ -80,7 +80,7 @@ final readonly class RouteHeadersSubscriber
         $headers = $event->getResponse()->headers;
         foreach ($this->rules as $rule) {
             if ($this->matches($rule, $request)) {
-                self::apply($rule, $headers);
+                $this->apply($rule, $headers);
             }
         }
     }
@@ -160,16 +160,16 @@ final readonly class RouteHeadersSubscriber
     /**
      * @param array{frame?: ?string, referrer?: ?string, robots?: ?string, no_store?: bool} $rule
      */
-    private static function apply(array $rule, ResponseHeaderBag $headers): void
+    private function apply(array $rule, ResponseHeaderBag $headers): void
     {
         $frame = $rule['frame'] ?? null;
         if (is_string($frame) && isset(self::FRAME_VALUES[$frame])) {
             [$xFrameOptions, $ancestors] = self::FRAME_VALUES[$frame];
             $headers->set('X-Frame-Options', $xFrameOptions);
-            $policies = self::rewritePolicies($headers, 'Content-Security-Policy', $ancestors);
+            $policies = $this->rewritePolicies($headers, 'Content-Security-Policy', $ancestors);
             $headers->set('Content-Security-Policy', [] !== $policies ? $policies : self::withFrameAncestors('', $ancestors));
             if ($headers->has('Content-Security-Policy-Report-Only')) {
-                $headers->set('Content-Security-Policy-Report-Only', self::rewritePolicies($headers, 'Content-Security-Policy-Report-Only', $ancestors));
+                $headers->set('Content-Security-Policy-Report-Only', $this->rewritePolicies($headers, 'Content-Security-Policy-Report-Only', $ancestors));
             }
         }
 
@@ -197,7 +197,7 @@ final readonly class RouteHeadersSubscriber
      *
      * @return list<string>
      */
-    private static function rewritePolicies(ResponseHeaderBag $headers, string $name, string $ancestors): array
+    private function rewritePolicies(ResponseHeaderBag $headers, string $name, string $ancestors): array
     {
         $policies = [];
         foreach ($headers->all($name) as $policy) {
