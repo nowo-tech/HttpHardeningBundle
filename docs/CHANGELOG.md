@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- PHP 8.6: `composer.json` allows PHP below 8.7 (was below 8.6). CI adds a forward-compatibility workflow with a
+  PHP 8.6 cell and a Symfony 8.2 cell (stable Symfony 8.2.0).
 - CI and `make test-coverage`: the Clover statement-coverage gate is now **100%** (was 99%). The suite is already at 100%; the gate only stops a regression from merging.
 - CI: a new `release-gates` job runs `make rector-dry`, `validate-phpdoc`, `validate-translations` and `check-twig-extra` (full mode only, one matrix cell each), so a gate cannot fail only at release time. CI only, no change to the shipped bundle.
 
